@@ -95,7 +95,7 @@ pub(crate) fn build_worktree_command(
                 normalize_worktree_target_path(params.get("worktreePath"), context)?;
             let branch = normalize_optional_git_ref(params.get("branch"), "branch")?;
             let base_ref = normalize_optional_git_ref(params.get("baseRef"), "baseRef")?;
-            let mut args = vec!["worktree".to_string(), "add".to_string()];
+            let mut args = long_path_git_args(["worktree", "add"]);
             /*
             CDXC:WorkMode 2026-10-09 WHY:
             A ticket branch cut from `origin/main` would otherwise track main, so `git status`
@@ -119,23 +119,15 @@ pub(crate) fn build_worktree_command(
                 normalize_existing_worktree_path(params.get("worktreePath"), context)?;
             let destination_path =
                 normalize_worktree_destination_path(params.get("destinationPath"), context)?;
-            ProcessCommand::new(
-                "git",
-                vec![
-                    "worktree".to_string(),
-                    "move".to_string(),
-                    "--".to_string(),
-                    worktree_path,
-                    destination_path,
-                ],
-                cwd,
-            )
+            let mut args = long_path_git_args(["worktree", "move", "--"]);
+            args.extend([worktree_path, destination_path]);
+            ProcessCommand::new("git", args, cwd)
         }
         "prune" => ProcessCommand::new("git", vec!["worktree", "prune"], cwd),
         "remove" => {
             let worktree_path =
                 normalize_existing_worktree_path(params.get("worktreePath"), context)?;
-            let mut args = vec!["worktree".to_string(), "remove".to_string()];
+            let mut args = long_path_git_args(["worktree", "remove"]);
             if params.get("force").and_then(Value::as_bool) == Some(true) {
                 args.push("--force".to_string());
             }
@@ -178,6 +170,23 @@ pub(crate) fn build_worktree_command(
             )))
         }
     })
+}
+
+/// `git <args>` for the worktree commands that write or delete a whole checkout.
+///
+/// CDXC:Worktrees 2026-10-10 WHY: A worktree folder sits beside the project with the branch's
+/// name appended (`C:\dev\sp-spx-13408-icon-boxes-icon-color`), which pushed a repo's deepest
+/// files past Windows' 260-character limit: `git worktree add` stopped with "Filename too long"
+/// even though the main checkout (a shorter folder) had the same files. Git for Windows only
+/// writes such paths with `core.longpaths`, so these commands turn it on for themselves; the
+/// repository's own config is left as the user set it.
+fn long_path_git_args<const N: usize>(args: [&str; N]) -> Vec<String> {
+    let mut command = Vec::with_capacity(N + 2);
+    if cfg!(windows) {
+        command.extend(["-c".to_string(), "core.longpaths=true".to_string()]);
+    }
+    command.extend(args.iter().map(|arg| arg.to_string()));
+    command
 }
 
 pub(crate) fn normalize_worktree_action(

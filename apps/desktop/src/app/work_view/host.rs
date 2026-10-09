@@ -34,6 +34,24 @@ impl GhostexGpuiApp {
         !self.work_view_project_ids().is_empty()
     }
 
+    /// The sidebar list changed and the window no longer shows any work-mode project (Workspaces
+    /// switched off, the last project's Work mode turned off or moved away): an open Work view
+    /// leaves like any view whose project context went away, and its page is released.
+    ///
+    /// CDXC:WorkMode 2026-10-10 WHY: The settings-save refresh that moves off a switched-off view
+    /// runs before gxserver republishes the projects without work mode, so it still saw the Work
+    /// view as available; the tab then stayed open with no label over a "Turn on Work mode" note.
+    pub(crate) fn leave_work_view_if_unavailable(
+        &mut self,
+        was_available: bool,
+        cx: &mut gpui::Context<Self>,
+    ) {
+        if was_available && !self.work_view_available() {
+            self.coerce_active_mode_to_available_project_context(cx);
+            self.prune_project_workarea_runtime_cef_surfaces_for_current_gates(cx);
+        }
+    }
+
     pub(crate) fn work_view_showing(&self) -> bool {
         self.active_mode == TitlebarMode::Work
     }

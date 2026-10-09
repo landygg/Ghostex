@@ -629,12 +629,20 @@ impl GhostexGpuiApp {
                                                 .overflow_hidden()
                                                 .whitespace_nowrap()
                                                 .text_ellipsis()
+                                                // A long suffix (Link to's "@owner's untitled
+                                                // project") gives way before the label does.
+                                                .when(item["suffix"].is_string(), |label| {
+                                                    label.flex_shrink_0()
+                                                })
                                                 .child(label),
                                         )
                                         .when_some(item["suffix"].as_str(), |row, suffix| {
                                             row.child(
                                                 div()
-                                                    .flex_shrink_0()
+                                                    .min_w_0()
+                                                    .overflow_hidden()
+                                                    .whitespace_nowrap()
+                                                    .text_ellipsis()
                                                     .text_size(px(10.0 * scale))
                                                     .opacity(0.6)
                                                     .child(suffix.to_owned()),

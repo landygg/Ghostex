@@ -478,16 +478,19 @@ fn worktree_move_builds_a_git_worktree_move_command() {
     let command = build_worktree_command("move", &params, &ctx).unwrap();
 
     assert_eq!(command.executable, "git");
-    assert_eq!(
-        command.args,
-        vec![
-            "worktree".to_string(),
-            "move".to_string(),
-            "--".to_string(),
-            normalize_path_string(worktree.clone()),
-            normalize_path_string(destination),
-        ]
-    );
+    let mut expected: Vec<String> = if cfg!(windows) {
+        vec!["-c".to_string(), "core.longpaths=true".to_string()]
+    } else {
+        Vec::new()
+    };
+    expected.extend([
+        "worktree".to_string(),
+        "move".to_string(),
+        "--".to_string(),
+        normalize_path_string(worktree.clone()),
+        normalize_path_string(destination),
+    ]);
+    assert_eq!(command.args, expected);
     assert_eq!(command.cwd, source.to_string_lossy());
 }
 

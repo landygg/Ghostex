@@ -244,6 +244,17 @@ impl GhostexGpuiApp {
     pub(crate) fn persist_shell_layout_state(&self) {}
     /// Session rows cannot be dragged onto panes here, so there is no pane drag to finish.
     pub(crate) fn finish_workspace_tab_drag(&mut self, _cx: &mut Context<Self>) {}
+    /// The page has no Work view (the desktop's `work_view/host.rs`), so a sidebar snapshot never
+    /// has one to leave.
+    pub(crate) fn work_view_available(&self) -> bool {
+        false
+    }
+    pub(crate) fn leave_work_view_if_unavailable(
+        &mut self,
+        _was_available: bool,
+        _cx: &mut Context<Self>,
+    ) {
+    }
 
     // Workspaces (`gx_store/workspaces.rs`): a page is one window with nothing to save it in, so
     // its workspace lasts for the page; it has no other windows and no Settings window.

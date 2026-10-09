@@ -450,6 +450,10 @@ fn synthesized_item(
                         item[key] = value.clone();
                     }
                 }
+                item["assignedToMe"] = json!(linear
+                    .pointer("/assignee/isMe")
+                    .and_then(Value::as_bool)
+                    .unwrap_or(false));
             }
         }
         WorkItemRef::GithubIssue(number) => {

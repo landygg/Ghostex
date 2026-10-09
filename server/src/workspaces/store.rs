@@ -239,6 +239,11 @@ pub(crate) fn update_workspace_in(
         .and_then(|workspaces| workspaces.get_mut(workspace_id))
         .and_then(Value::as_object_mut)
         .ok_or_else(|| DomainStateError::bad_request("No such workspace."))?;
+    // A blank name would be dropped by the normalizer, which then names the workspace after its
+    // id; refuse it the way create does.
+    if params.contains_key("name") && bounded_text(params.get("name"), MAX_NAME_CHARS).is_none() {
+        return Err(DomainStateError::bad_request("A workspace needs a name."));
+    }
     for key in ["name", "color", "letter", "kind", "claudeAccountId", "tracker"] {
         match params.get(key) {
             Some(Value::Null) => {

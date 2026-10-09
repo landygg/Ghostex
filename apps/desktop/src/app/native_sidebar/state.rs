@@ -116,7 +116,9 @@ impl GhostexGpuiApp {
                     .any(|session| session.is_focused && session.is_browser())
         });
         self.gx_store_note_sidebar_snapshot_browser_focus(browser_focus);
+        let work_view_was_available = self.work_view_available();
         self.native_sidebar.snapshot = Some(snapshot);
+        self.leave_work_view_if_unavailable(work_view_was_available, cx);
         cx.notify();
     }
 }

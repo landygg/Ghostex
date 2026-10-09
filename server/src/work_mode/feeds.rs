@@ -23,6 +23,14 @@ const VIEWER_LOGIN_TTL: Duration = Duration::from_secs(60 * 60);
 /// Rows one feed returns. The page is a list of ongoing work, not an archive.
 const LINEAR_LIST_LIMIT: usize = 100;
 const GITHUB_LIST_LIMIT: &str = "50";
+/// How long one repo's `gh pr list` / `gh issue list` may take.
+///
+/// CDXC:WorkMode 2026-10-10 WHY: `statusCheckRollup` on 50 open PRs of a repo with a large CI
+/// matrix (ShortPoint's) takes 5 to 9 s, so the 10 s limit of the git-status probes
+/// (`run_gh_command`) cut it off under load and the Work page showed no PRs and no issues at all,
+/// with that failure cached for the whole feed TTL. The route never waits on this fetch (it stops
+/// after `WORK_LIST_WAIT` and the page shows "refreshing"), so a longer limit costs nothing.
+const GITHUB_LIST_TIMEOUT: Duration = Duration::from_secs(45);
 /// A PR body is only scanned for "Fixes #218", so a long one is cut.
 const PULL_REQUEST_BODY_CHARS: usize = 4000;
 
@@ -455,7 +463,7 @@ fn fetch_github_feed(cwd: &str) -> Result<GithubFeed, String> {
     } else {
         "number,title,url,author,assignees,updatedAt,labels"
     };
-    let pull_requests = run_gh_command(
+    let pull_requests = run_gh_full(
         Some(cwd),
         &[
             "pr",
@@ -467,8 +475,19 @@ fn fetch_github_feed(cwd: &str) -> Result<GithubFeed, String> {
             "--json",
             pull_request_fields,
         ],
+        GITHUB_LIST_TIMEOUT,
     )
-    .ok_or_else(|| "gh could not list this repo's pull requests.".to_string())?;
+    .ok_or_else(|| "gh took too long to list this repo's pull requests.".to_string())
+    .and_then(|run| {
+        if run.success {
+            Ok(run.stdout)
+        } else {
+            Err(format!(
+                "gh could not list this repo's pull requests: {}",
+                run.error_text()
+            ))
+        }
+    })?;
     let pull_requests: Vec<GithubListPullRequest> =
         serde_json::from_str::<Value>(pull_requests.trim())
             .ok()
@@ -477,7 +496,7 @@ fn fetch_github_feed(cwd: &str) -> Result<GithubFeed, String> {
             .iter()
             .filter_map(parse_github_list_pull_request)
             .collect();
-    let issues = run_gh_command(
+    let issues = run_gh_full(
         Some(cwd),
         &[
             "issue",
@@ -489,8 +508,10 @@ fn fetch_github_feed(cwd: &str) -> Result<GithubFeed, String> {
             "--json",
             issue_fields,
         ],
+        GITHUB_LIST_TIMEOUT,
     )
-    .and_then(|output| serde_json::from_str::<Value>(output.trim()).ok())
+    .filter(|run| run.success)
+    .and_then(|run| serde_json::from_str::<Value>(run.stdout.trim()).ok())
     .and_then(|value| value.as_array().cloned())
     .unwrap_or_default()
     .iter()
