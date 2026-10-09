@@ -116,6 +116,8 @@ pub(crate) struct AgentsTab {
     inline_committed: HashMap<SharedString, String>,
     /// The Skip permissions? confirmation is open.
     confirming_bypass: bool,
+    /// The Uninstall hooks for all agents? confirmation is open (shares `confirm_focus`).
+    confirming_uninstall_hooks: bool,
     confirm_focus: FocusHandle,
     cli: cli::CliModel,
     dropdowns: HashMap<SharedString, select::DropdownState>,
@@ -178,6 +180,7 @@ impl AgentsTab {
             hooks_menu_open: false,
             hooks_menu_trigger: Rc::new(Cell::new(None)),
             confirming_bypass: false,
+            confirming_uninstall_hooks: false,
             confirm_focus: cx.focus_handle(),
             cli: cli::CliModel::default(),
             dropdowns: HashMap::new(),
@@ -210,6 +213,7 @@ impl AgentsTab {
             self.inline_inputs.clear();
             self.inline_committed.clear();
             self.confirming_bypass = false;
+            self.confirming_uninstall_hooks = false;
             self.hooks_menu_open = false;
             self.cli_reset();
             self.dropdowns.clear();
@@ -326,7 +330,7 @@ impl AgentsTab {
 impl super::HoldsUnsavedInput for AgentsTab {
     /// The Add custom agent form or the Skip permissions? confirmation is open.
     fn holds_unsaved_input(&self, _cx: &gpui::App) -> bool {
-        self.editor.is_some() || self.confirming_bypass
+        self.editor.is_some() || self.confirming_bypass || self.confirming_uninstall_hooks
     }
 }
 
@@ -383,7 +387,9 @@ impl Render for AgentsTab {
                 blocks.push(PageBlock::section(HOOKS_ANCHOR, section));
             }
         }
-        let dialog = self.render_bypass_dialog(&p, window, cx);
+        let dialog = self
+            .render_bypass_dialog(&p, window, cx)
+            .or_else(|| self.render_uninstall_hooks_dialog(&p, window, cx));
         div()
             .size_full()
             .child(settings_page(

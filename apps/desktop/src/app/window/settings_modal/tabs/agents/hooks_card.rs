@@ -7,8 +7,9 @@
 //! User: "ok implement the plan" for the Agents page redesign. The bulk hook tools leave the top of the agent list for this card at the bottom; the list keeps only a summary line (counting agents that are on) with Fix all. This replaces the 2026-08-28 roster toolbar ("quiet whole-set controls, a readiness chip and an info tooltip"), because a "3/23 hooks ready" count of every supported agent named agents the user never turned on.
 use super::super::super::super::native_modal_kit::*;
 use super::super::super::fields::{
-    ButtonSize, ButtonVariant, RowSpec, card_inset, settings_button_sized, settings_icon,
-    settings_icon_button, settings_section, toggle_field,
+    ButtonSize, ButtonVariant, RowSpec, SettingsDialogSpec, card_inset, dialog_footer,
+    settings_button, settings_button_sized, settings_dialog, settings_icon, settings_icon_button,
+    settings_section, toggle_field,
 };
 use super::super::super::palette::SettingsPalette;
 use super::super::super::search::{TabSearch, should_show_setting};
@@ -245,9 +246,10 @@ impl AgentsTab {
             .text_color(hsla(p.foreground))
             .cursor_pointer()
             .hover(move |this| this.bg(hsla(hover)))
-            .on_press(cx, |page, _window, cx| {
+            .on_press(cx, |page, window, cx| {
                 page.hooks_menu_open = false;
-                page.uninstall_hooks(None, cx);
+                page.confirming_uninstall_hooks = true;
+                page.confirm_focus.focus(window, cx);
                 cx.notify();
             })
             .child(settings_icon(icons::TRASH, 16.0, p.foreground))
@@ -287,5 +289,69 @@ impl AgentsTab {
         )
         .with_priority(1)
         .into_any_element()
+    }
+
+    /// The Uninstall hooks for all agents? confirmation, in the Skip permissions? dialog's style.
+    ///
+    /// CDXC:Settings 2026-10-10 DECISION:
+    /// User (via the coordinator): "show a confirmation before Uninstall all (e.g. 'Uninstall hooks for all agents?' with Uninstall / Cancel), using the existing Settings confirm style ('Skip permissions?')".
+    pub(super) fn render_uninstall_hooks_dialog(
+        &mut self,
+        p: &SettingsPalette,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Option<AnyElement> {
+        if !self.confirming_uninstall_hooks {
+            return None;
+        }
+        let cancel = settings_button(
+            p,
+            "agents-hooks-uninstall-cancel",
+            "Cancel",
+            None,
+            ButtonVariant::Outline,
+            false,
+            None,
+            |page: &mut Self, _window, cx| {
+                page.confirming_uninstall_hooks = false;
+                cx.notify();
+            },
+            cx,
+        );
+        let confirm = settings_button(
+            p,
+            "agents-hooks-uninstall-confirm",
+            "Uninstall",
+            None,
+            ButtonVariant::DestructiveDialog,
+            false,
+            None,
+            |page: &mut Self, _window, cx| {
+                page.confirming_uninstall_hooks = false;
+                page.uninstall_hooks(None, cx);
+                cx.notify();
+            },
+            cx,
+        );
+        let focus = self.confirm_focus.clone();
+        Some(settings_dialog(
+            p,
+            SettingsDialogSpec::new("agents-hooks-uninstall", "Uninstall hooks for all agents?")
+                .width(400.0)
+                .spacing(20.0, 16.0)
+                .description(
+                    "Ghostex will no longer resume the exact conversation after sleep, reload or restart until the hooks are installed again."
+                        .into_any_element(),
+                ),
+            Vec::new(),
+            Some(dialog_footer(vec![cancel, confirm])),
+            Some(&focus),
+            |page: &mut Self, _window, cx| {
+                page.confirming_uninstall_hooks = false;
+                cx.notify();
+            },
+            window,
+            cx,
+        ))
     }
 }
