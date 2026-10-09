@@ -1,9 +1,9 @@
 use std::{
     env, fs,
     io::{Read, Write},
-    net::TcpStream,
+    net::{TcpStream, ToSocketAddrs},
     path::{Path, PathBuf},
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
@@ -572,6 +572,8 @@ fn post_gxserver_hook_event(
     .unwrap_or_default()
 }
 
+/// CDXC:AgentHooks 2026-10-09 WHY:
+/// Standard DNS resolution has no deadline and socket timeouts apply to each operation, so only resolution runs off-thread and every socket operation uses the remaining hook budget; a late DNS answer cannot send a hook event.
 fn post_json(
     base_url: &str,
     path: &str,
@@ -579,6 +581,15 @@ fn post_json(
     protocol_version: i64,
     body: &Value,
 ) -> std::io::Result<String> {
+    let deadline = Instant::now() + Duration::from_millis(1500);
+    let remaining = || {
+        deadline
+            .checked_duration_since(Instant::now())
+            .filter(|duration| !duration.is_zero())
+            .ok_or_else(|| {
+                std::io::Error::new(std::io::ErrorKind::TimedOut, "Agent hook request timed out")
+            })
+    };
     let Ok(url) = url::Url::parse(base_url) else {
         return Ok(String::new());
     };
@@ -590,18 +601,55 @@ fn post_json(
     };
     let port = url.port_or_known_default().unwrap_or(80);
     let address = format!("{host}:{port}");
-    let timeout = Duration::from_millis(1500);
-    let mut stream = TcpStream::connect(&address)?;
-    stream.set_read_timeout(Some(timeout))?;
-    stream.set_write_timeout(Some(timeout))?;
+    let resolve_address = address.clone();
+    let (sender, receiver) = std::sync::mpsc::channel();
+    std::thread::Builder::new().spawn(move || {
+        let _ = sender.send(
+            resolve_address
+                .to_socket_addrs()
+                .map(|addresses| addresses.collect::<Vec<_>>()),
+        );
+    })?;
+    let addresses = receiver
+        .recv_timeout(remaining()?)
+        .map_err(|error| std::io::Error::new(std::io::ErrorKind::TimedOut, error))??;
+    let mut connection = Err(std::io::Error::new(
+        std::io::ErrorKind::AddrNotAvailable,
+        "Agent hook host resolved to no addresses",
+    ));
+    for address in addresses {
+        connection = TcpStream::connect_timeout(&address, remaining()?);
+        if connection.is_ok() {
+            break;
+        }
+    }
+    let mut stream = connection?;
     let body = serde_json::to_string(body).unwrap_or_else(|_| "{}".to_string());
     let request = format!(
         "POST {path} HTTP/1.1\r\nHost: {address}\r\nConnection: close\r\nAuthorization: Bearer {token}\r\nContent-Type: application/json\r\n{GXSERVER_PROTOCOL_HEADER}: {protocol_version}\r\nContent-Length: {}\r\n\r\n{body}",
         body.len()
     );
-    stream.write_all(request.as_bytes())?;
+    let mut pending = request.as_bytes();
+    while !pending.is_empty() {
+        stream.set_write_timeout(Some(remaining()?))?;
+        match stream.write(pending) {
+            Ok(0) => return Err(std::io::ErrorKind::WriteZero.into()),
+            Ok(written) => pending = &pending[written..],
+            Err(error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
+            Err(error) => return Err(error),
+        }
+    }
     let mut response = Vec::new();
-    let _ = stream.read_to_end(&mut response);
+    let mut buffer = [0; 8192];
+    while let Ok(timeout) = remaining() {
+        stream.set_read_timeout(Some(timeout))?;
+        match stream.read(&mut buffer) {
+            Ok(0) => break,
+            Ok(read) => response.extend_from_slice(&buffer[..read]),
+            Err(error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
+            Err(_) => break,
+        }
+    }
     Ok(String::from_utf8_lossy(&response).into_owned())
 }
 

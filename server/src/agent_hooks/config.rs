@@ -258,19 +258,18 @@ pub(crate) fn command_agent(agent_id: &str) -> Option<&'static str> {
 CDXC:AgentHooks 2026-08-27:
 Codex CLI silently clamps the Interrupt hook timeout to 3 seconds and prints
 "⚠ clamping Interrupt hook timeout to 3s in ~/.codex/hooks.json" on every run.
-Writing the clamped value ourselves keeps the warning off the user's terminal
-without changing any other Codex hook's 5s budget.
+Writing the clamped value ourselves keeps the warning off the user's terminal.
 */
 pub(crate) const CODEX_INTERRUPT_HOOK_TIMEOUT_SECONDS: i64 = 3;
 
 pub(crate) fn nested_timeout(agent_id: &str) -> Option<i64> {
     match agent_id {
-        "codex" | "grok" | "zcode" | "empryo" => Some(5),
+        // Providers include Windows shell startup in this budget; even a direct
+        // native hook exceeded 11 seconds on Windows during diagnosis.
+        "codex" | "grok" | "claude" | "openclaude" if cfg!(windows) => Some(30),
+        "codex" | "grok" | "claude" | "openclaude" | "zcode" | "empryo" => Some(5),
         "command-code" | "devin" => Some(10),
         "gemini" => Some(10000),
-        // `openclaude` is deliberately absent: OpenClaude is a Claude-shaped
-        // settings.json, and Claude has no entry either, so both fall into the
-        // same 5000 default and stay in lockstep.
         _ => None,
     }
 }

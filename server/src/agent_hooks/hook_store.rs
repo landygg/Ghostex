@@ -1,6 +1,7 @@
 use std::{
     env, fs,
     path::{Path, PathBuf},
+    time::{Duration, Instant},
 };
 
 use serde_json::{json, Map, Value};
@@ -73,8 +74,16 @@ pub(super) fn write_hook_store(
     else {
         return;
     };
-    if lock_file.lock().is_err() {
-        return;
+    // Session metadata is best effort; a contended writer must not stall the agent.
+    let lock_deadline = Instant::now() + Duration::from_millis(200);
+    loop {
+        match lock_file.try_lock() {
+            Ok(()) => break,
+            Err(fs::TryLockError::WouldBlock) if Instant::now() < lock_deadline => {
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            Err(_) => return,
+        }
     }
     // Re-read under the lock: another hook process may have written since the unlocked check.
     let mut data = read_store(&store_path);

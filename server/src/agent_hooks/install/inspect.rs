@@ -4,9 +4,9 @@ use serde_json::{json, Value};
 
 use crate::agent_hooks::codex_status_line::codex_status_line_names_model;
 use crate::agent_hooks::config::{
-    all_hook_events, hook_format, hook_marker, pi_extension_path_is_loader_visible, HookDefinition,
-    HookFormat, HookPaths, CODEX_INTERRUPT_HOOK_TIMEOUT_SECONDS, OPENCODE_PLUGIN_MARKER,
-    OPENCODE_PLUGIN_SPEC,
+    all_hook_events, hook_format, hook_marker, nested_event_timeout,
+    pi_extension_path_is_loader_visible, HookDefinition, HookFormat, HookPaths,
+    OPENCODE_PLUGIN_MARKER, OPENCODE_PLUGIN_SPEC,
 };
 use crate::agent_hooks::plugin_sources::{command_for_agent, current_plugin_marker};
 use crate::agent_hooks::probing::{path_string, read_file_text};
@@ -37,7 +37,10 @@ pub(crate) fn inspect_agent_hook_installation(
     let command = command_for_agent(definition, &hook_paths.notify_hook_path);
     match hook_format(definition.agent_id) {
         HookFormat::Opencode => {
-            if let Some(config) = config_paths.get(1).filter(|p| p.file_name().is_some_and(|n| n == "cli.json")) {
+            if let Some(config) = config_paths
+                .get(1)
+                .filter(|p| p.file_name().is_some_and(|n| n == "cli.json"))
+            {
                 return super::opencode_v2::inspect(hook_paths, config.parent().unwrap());
             }
             let plugin_text = config_paths
@@ -48,9 +51,10 @@ pub(crate) fn inspect_agent_hook_installation(
                 .get(1)
                 .map(|path| read_file_text(path))
                 .unwrap_or_default();
-            let notify_hook_literal = json!(path_string(&hook_paths.notify_hook_path)).to_string();
-            let current = plugin_text.contains(&current_plugin_marker(OPENCODE_PLUGIN_MARKER))
-                && plugin_text.contains(&notify_hook_literal)
+            let current = plugin_text
+                == crate::agent_hooks::plugin_sources::build_opencode_plugin_source(
+                    &hook_paths.notify_hook_path,
+                )
                 && config_text.contains(OPENCODE_PLUGIN_SPEC);
             HookInspection {
                 current_hook_installed: current,
@@ -189,8 +193,11 @@ fn inspect_json_hook_config(
 ) -> HookInspection {
     let data = read_json_object(&read_file_text(config_path));
     let stale_ghostex_hook_present = json_contains_stale_ghostex_owned_hook_command(&data, command);
-    let codex_interrupt_timeout_current =
-        definition.agent_id != "codex" || codex_interrupt_hook_timeout_is_current(&data, command);
+    let timeout_current =
+        !matches!(
+            definition.agent_id,
+            "codex" | "grok" | "claude" | "openclaude"
+        ) || nested_hook_timeouts_are_current(&data, definition.agent_id, command);
     // CDXC:AgentHooks 2026-09-03 WHY: a Claude install is only current once
     // its statusLine runs the Ghostex script, so an older install reads as
     // updateRequired and the Update Hooks button (or daemon repair) adds it.
@@ -213,7 +220,7 @@ fn inspect_json_hook_config(
                 command,
                 hook_format(definition.agent_id),
             )
-            && codex_interrupt_timeout_current
+            && timeout_current
             && claude_statusline_current
             && cursor_statusline_current
             && codex_status_line_current
@@ -282,21 +289,19 @@ fn json_hook_event_coverage_is_current(
     })
 }
 
-/// True when a Ghostex-owned Codex Interrupt hook already carries the clamped
-/// 3s timeout Codex CLI enforces; a stale 5s entry must be rewritten so the CLI
-/// stops printing its clamping warning.
-fn codex_interrupt_hook_timeout_is_current(data: &Value, command: &str) -> bool {
-    data.get("hooks")
-        .and_then(Value::as_object)
-        .and_then(|hooks| hooks.get("Interrupt"))
-        .and_then(Value::as_array)
-        .is_some_and(|entries| {
-            hook_entries_contain(entries, &|hook| {
-                is_hook_command(hook, command)
-                    && hook.get("timeout").and_then(Value::as_i64)
-                        == Some(CODEX_INTERRUPT_HOOK_TIMEOUT_SECONDS)
+fn nested_hook_timeouts_are_current(data: &Value, agent: &str, command: &str) -> bool {
+    all_hook_events(agent).iter().all(|event| {
+        data.get("hooks")
+            .and_then(|hooks| hooks.get(*event))
+            .and_then(Value::as_array)
+            .is_some_and(|entries| {
+                !hook_entries_contain(entries, &|hook| {
+                    is_hook_command(hook, command)
+                        && hook.get("timeout").and_then(Value::as_i64)
+                            != nested_event_timeout(agent, event)
+                })
             })
-        })
+    })
 }
 
 /// Applies `predicate` to hook objects of every JSON hook shape Ghostex writes:

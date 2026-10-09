@@ -80,6 +80,13 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 
 const PLUGIN_INSTALLED_KEY = Symbol.for("ghostex.session.restore.plugin.installed");
+const hookFailures = new Set();
+
+function reportHookFailure(reason) {
+  if (hookFailures.has(reason)) return;
+  hookFailures.add(reason);
+  console.error(`[Ghostex] OpenCode hook failed: ${reason}`);
+}
 
 function firstString(...values) {
   for (const value of values) {
@@ -204,6 +211,10 @@ function hookEventName(subcommand) {
 
 function sendHook(subcommand, ctx, event, extra = {}) {
   if (process.env.GHOSTEX_OPENCODE_HOOKS_DISABLED === "1") return;
+  const env = process.env;
+  if (env.GHOSTEX_INTERNAL_PROMPT_GENERATION === "1" || env.GHOSTEX_INTERNAL_TITLE_GENERATION === "1") return;
+  if (!(env.VSMUX_SESSION_STATE_FILE || env.GHOSTEX_SESSION_STATE_FILE || env.ghostex_SESSION_STATE_FILE)
+    && !(env.GHOSTEX_GLOBAL_SESSION_REF && env.GHOSTEX_GXSERVER_BASE_URL && env.GHOSTEX_GXSERVER_AUTH_TOKEN_FILE)) return;
   const sessionId = sessionIdFor(event);
   if (!sessionId) return;
   const cwd = cwdFor(ctx, event);
@@ -217,14 +228,21 @@ function sendHook(subcommand, ctx, event, extra = {}) {
     ...extra,
   };
   try {
-    spawnSync(__NOTIFY_HOOK_PATH_JSON__, [], {
+    const [command, args] = process.platform === "win32"
+      ? [__GXSERVER_PATH_JSON__, ["agent-hook-notify-native", __NOTIFY_HOOK_PATH_JSON__, "opencode"]]
+      : [__NOTIFY_HOOK_PATH_JSON__, []];
+    const result = spawnSync(command, args, {
       input: JSON.stringify(payload),
       encoding: "utf8",
       env: hookEnvironment(cwd),
       stdio: ["pipe", "ignore", "ignore"],
       timeout: 5000,
+      windowsHide: true,
     });
-  } catch (_) {}
+    if (result.error) reportHookFailure(result.error.code || result.error.name);
+    else if (result.status !== 0) reportHookFailure(result.signal || `exit ${result.status}`);
+    else hookFailures.clear();
+  } catch (error) { reportHookFailure(error.code || error.name || "spawn failed"); }
 }
 
 function handleEvent(ctx, event) {
@@ -304,6 +322,7 @@ export default GhostexSessionRestore;
 "###;
     source
         .replace("__MARKER__", &current_plugin_marker(OPENCODE_PLUGIN_MARKER))
+        .replace("__GXSERVER_PATH_JSON__", &gxserver_path_json())
         .replace("__NOTIFY_HOOK_PATH_JSON__", &notify_json)
 }
 
@@ -466,13 +485,20 @@ export default function ghostexAmpSessionPlugin(amp: PluginAPI) {
         .replace("__NOTIFY_HOOK_PATH_JSON__", &notify_json)
 }
 
-/// CDXC:AgentHooks 2026-10-05 WHY:
-/// Native Windows cannot spawn the notify hook script, so the Pi, OMP and Amp extensions hand it to this gxserver's `agent-hook-notify-native`, as Claude's Windows hook command and OpenCode's v2 plugin do. Before this a session of any of them on native Windows reported nothing: no session id, no working or done state.
+/// CDXC:AgentHooks 2026-10-09 WHY:
+/// Native Windows cannot spawn the notify hook script, so the Pi, OMP, Amp and OpenCode extensions hand it to this gxserver's `agent-hook-notify-native`. Other platforms invoke the script directly and must not embed an unused executable path: moving gxserver would otherwise make source inspection report a working plugin as stale.
 fn gxserver_path_json() -> String {
-    let gxserver = std::env::current_exe()
-        .map(|path| path_string(&path))
-        .unwrap_or_default();
-    serde_json::to_string(&gxserver).unwrap_or_else(|_| "\"\"".to_string())
+    #[cfg(windows)]
+    {
+        let gxserver = std::env::current_exe()
+            .map(|path| path_string(&path))
+            .unwrap_or_default();
+        serde_json::to_string(&gxserver).unwrap_or_else(|_| "\"\"".to_string())
+    }
+    #[cfg(not(windows))]
+    {
+        "\"\"".to_string()
+    }
 }
 
 fn build_pi_extension_source(notify_hook_path: &Path) -> String {
@@ -1079,7 +1105,7 @@ pub(crate) fn current_plugin_marker(marker: &str) -> String {
     if marker == PI_EXTENSION_MARKER || marker == AMP_PLUGIN_MARKER {
         format!("{marker} v5")
     } else if marker == OPENCODE_PLUGIN_MARKER {
-        format!("{marker} v4")
+        format!("{marker} v5")
     } else if marker == OMP_EXTENSION_MARKER {
         format!("{marker} v3")
     } else {

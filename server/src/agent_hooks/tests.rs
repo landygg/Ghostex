@@ -69,7 +69,8 @@ fn hook_status_reports_profile_only_provider_hook_paths() {
         .map(|event_name| {
             (
                 event_name.to_string(),
-                json!([{ "hooks": [{ "type": "command", "command": command }] }]),
+                json!([{ "hooks": [{ "type": "command", "command": command,
+                    "timeout": super::config::nested_event_timeout("claude", event_name) }] }]),
             )
         })
         .collect::<serde_json::Map<String, Value>>();

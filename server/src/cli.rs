@@ -30,6 +30,24 @@ pub async fn run_from_env() -> Result<()> {
     run(env::args().skip(1).collect()).await
 }
 
+/// CDXC:AgentHooks 2026-10-09 WHY:
+/// Hook processes run on every tool event and Codex caps Interrupt at 3 seconds. They need neither the daemon runtime nor storage migration and build identity discovery before they can report an event or return outside Ghostex.
+pub fn run_hook_command(args: &[String]) -> Option<Result<()>> {
+    match args.first().map(String::as_str) {
+        #[cfg(windows)]
+        Some("agent-hook-notify-native") => {
+            Some(crate::agent_hooks::windows::notify(args[1..].to_vec()))
+        }
+        Some("agent-hook-notify") => Some((|| {
+            if let Some(answer) = run_notify_hook(args[1..].to_vec())? {
+                println!("{answer}");
+            }
+            Ok(())
+        })()),
+        _ => None,
+    }
+}
+
 /*
 CDXC:Cli 2026-06-14-20:37:
 The Rust CLI intentionally keeps the TypeScript command surface and --json behavior for start, stop, stop-all, and status so app/CLI opt-in can swap binaries without changing client command construction.
@@ -38,6 +56,9 @@ CDXC:Cli 2026-06-22-04:47:
 `gxserver status` reports any reachable same-product, same-protocol daemon as running; build identity is a start-time replacement decision. `gxserver start` must match TypeScript by requesting control-plane shutdown for a running build-identity mismatch instead of returning a Rust-only portConflict status.
 */
 pub async fn run(args: Vec<String>) -> Result<()> {
+    if let Some(result) = run_hook_command(&args) {
+        return result;
+    }
     let command = args.first().map(String::as_str);
     /*
     `setup` is the recovery boundary for an uploaded managed package. It must
@@ -113,17 +134,6 @@ pub async fn run(args: Vec<String>) -> Result<()> {
         Some("endpoint") => print_endpoint()?,
         Some("agent-skills") => {
             run_agent_skills_command(args.iter().skip(1).cloned().collect()).await?;
-        }
-        #[cfg(windows)]
-        Some("agent-hook-notify-native") => {
-            crate::agent_hooks::windows::notify(args.iter().skip(1).cloned().collect())?;
-        }
-        Some("agent-hook-notify") => {
-            // A ZCode coordinator's SessionStart answer reaches the bash wrapper through this
-            // stdout; the wrapper forwards it in place of its canned response.
-            if let Some(answer) = run_notify_hook(args.iter().skip(1).cloned().collect())? {
-                println!("{answer}");
-            }
         }
         #[cfg(windows)]
         Some("agent-statusline-native") => {
