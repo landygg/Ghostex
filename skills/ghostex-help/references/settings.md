@@ -300,7 +300,7 @@ How to use this file:
 - **Custom Title Command** `customSessionTitleGenerationCommand` (text, default (empty)): Custom command run with the title prompt on stdin when Title Generation Agent is custom. It should print only the title.
 ### Session resume hooks
 
-- **Session resume hooks** `agentResumeHooks` (Settings UI row without a settings key; use `ghostex settings open`): Hooks let Ghostex capture each agent's native session id and resume the exact conversation after sleep, reload, or app restart. Install one agent's hook from its row, fix every agent that is on with Fix all, or install and remove every Ghostex hook with Install all and Uninstall all.
+- **Session resume hooks** `agentResumeHooks` (Settings UI row without a settings key; use `ghostex settings open`): Hooks let Ghostex capture each agent's native session id and resume the exact conversation after sleep, reload, or app restart. Install one agent's hook from its row, fix every agent that is on with Fix all, install every missing hook with Install all (shown only when a hook is missing), or remove every Ghostex hook with Uninstall all in the ⋯ menu.
 - **Install the hook when I turn on an agent** `agentHooksAutoInstall` (boolean, default false): Install an agent's session resume hook as soon as you turn it on, without asking.
 ## Integrations (tab `integrations`)
 
