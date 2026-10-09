@@ -2,6 +2,35 @@
 
 ## Unreleased
 
+## 10.18.0 - 2026-10-10
+
+**Ghostex 10.18.0 is out.** Coordinators are now called Orchestrators, failed sends fix themselves, the phone app stops crashing and reaches your Windows computer again, and Windows hooks, cloning and helper windows behave.
+
+### 🧭 Orchestrators
+- **Coordinators are now called Orchestrators** across the app, the phone, Help and the CLI; `ghostex orchestrator` is the new command and `ghostex coordinator` still works.
+
+### 💬 Chat
+- **Failed sends fix themselves:** Ghostex redraws a stuck screen, retypes once, or restarts the agent on its own conversation and delivers your message, and shows a card with one Fix it button only when that fails.
+- **A Claude session that quit before its first message starts fresh** instead of failing to resume.
+- **Messages from other agents show their real text,** and Not sent appears only when a send really failed.
+- **Sliding a panel no longer rebuilds a long chat every frame,** and the question card's buttons have an outline.
+
+### 🪟 Windows
+- **Agent hooks no longer time out on Windows** for Claude, Codex, Grok, OpenClaude and OpenCode, thanks to @gvastethecreator.
+- **No more console windows flashing** from anything Ghostex starts in the background.
+- **Window glass uses Windows 11's own blur,** which keeps sliding panels smooth; new installs on Windows still start with glass off.
+
+### 📂 Projects and Files
+- **Add Project's clone shows git's progress,** can be cancelled, never hangs on a password prompt, and starts at your drives on Windows.
+- **Project websites like GitHub, Linear and Jira open straight to the page** instead of a command screen.
+- **Confirm delete in the files list is bold red,** and text buttons in Settings and the Agents Hub have an outline.
+
+### 📱 Phone
+- **The Android app no longer crashes** and can send to a Windows computer again; Ghostex on the computer also listens where older phone apps look.
+
+### 🧩 Workspaces and Work Mode
+- **Work Mode adds team Linear keys and GitHub as a workspace's tracker,** with work cards on the phone (Settings > Extensions > Workspaces and Work Mode).
+
 ## 10.17.0 - 2026-10-09
 
 **Ghostex 10.17.0 is out.** Workspaces and Work Mode arrive as an extension you can turn on, a chat's history no longer disappears after Escape, dialogs keep their focus on Windows, and the Files editor gets find, Open with and proper Windows editing keys.
