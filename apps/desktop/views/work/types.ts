@@ -289,6 +289,8 @@ export interface WorkItemDetails {
   linear?: LinearIssueDetails | null;
   githubIssue?: GithubIssueDetails | null;
   pullRequest?: PullRequestDetails | null;
+  /** A PR's tickets (`SPX-1245`, `#218`): its sessions' links, its branch, Linear's attachment. */
+  tickets?: string[];
   media: WorkMedia[];
   links: { title: string; subtitle?: string | null; url: string }[];
   teamFlow: { source: string; steps: TeamFlowStepState[] };

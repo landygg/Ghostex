@@ -217,7 +217,11 @@ view from the strip.
   A page in the Browser or in a website or extension view (Linear, Jira) can open
   another app through its link, such as Okta Verify, Zoom, Teams or an email link:
   Ghostex asks first ("Open Okta Verify?") and opens the app only when you choose
-  Open. A link no installed app can open does nothing. A sign-in page that checks
+  Open. A link no installed app can open does nothing. The page stays as it was, and
+  a Browser tab opened only for that link closes once you answer. Linear sends its
+  links to the Linear desktop app when its "Open in desktop app" preference is on;
+  turn it off in Linear's Settings > Account > Preferences inside the Ghostex
+  Browser to keep Linear pages there. A sign-in page that checks
   for an app on this computer (Okta FastPass looks for Okta Verify this way) asks
   "Allow … to connect to apps on this computer?"; Allow is remembered for that site.
   If the sign-in gave up while the question was open, try it again.

@@ -418,9 +418,26 @@ wrap_resource_request_handler! {
 wrap_request_handler! {
     pub(crate) struct GhostexGpuiBrowserRequestHandler {
         popup_open_handler: BrowserPopupOpenHandler,
+        page_metadata_handler: Option<BrowserPageMetadataHandler>,
     }
 
     impl RequestHandler {
+        fn on_before_browse(
+            &self,
+            browser: Option<&mut cef::Browser>,
+            frame: Option<&mut Frame>,
+            request: Option<&mut Request>,
+            _user_gesture: c_int,
+            _is_redirect: c_int,
+        ) -> c_int {
+            cancel_external_app_navigation(
+                browser,
+                frame,
+                request,
+                self.page_metadata_handler.as_ref(),
+            ) as c_int
+        }
+
         fn resource_request_handler(
             &self,
             _browser: Option<&mut cef::Browser>,
@@ -499,12 +516,22 @@ wrap_request_handler! {
     impl RequestHandler {
         fn on_before_browse(
             &self,
-            _browser: Option<&mut cef::Browser>,
+            browser: Option<&mut cef::Browser>,
             frame: Option<&mut Frame>,
             request: Option<&mut Request>,
             _user_gesture: c_int,
             _is_redirect: c_int,
         ) -> c_int {
+            let (mut frame, mut request) = (frame, request);
+            // An HTML file's app links run in its sub-frame, so this comes before the frame check.
+            if cancel_external_app_navigation(
+                browser,
+                frame.as_deref_mut(),
+                request.as_deref_mut(),
+                None,
+            ) {
+                return 1;
+            }
             let is_main_frame = frame.map(|frame| frame.is_main() != 0).unwrap_or(true);
             if !is_main_frame {
                 return 0;

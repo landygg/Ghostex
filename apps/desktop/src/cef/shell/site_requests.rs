@@ -28,6 +28,17 @@ pub struct BrowserExternalAppRequest {
     pub scheme: String,
     /// The asking page's `scheme://host[:port]`, empty when it is not an http(s) page.
     pub origin: String,
+    /// Closes the Browser tab that was opened only for this link; runs once the request is done
+    /// with (answered, skipped or not shown), so it never outlives the prompt.
+    close_link_only_tab: Option<BrowserPageMetadataHandler>,
+}
+
+impl Drop for BrowserExternalAppRequest {
+    fn drop(&mut self) {
+        if let Some(handler) = self.close_link_only_tab.take() {
+            handler(BrowserPageMetadataEvent::CloseRequested);
+        }
+    }
 }
 
 /// A pending Local Network Access prompt. It stays open until `allow` runs or it is dropped, and
@@ -173,6 +184,45 @@ pub(crate) fn dispatch_external_app_popup(
             url,
             scheme,
             origin: browser_page_origin(browser),
+            close_link_only_tab: None,
+        },
+    ));
+    true
+}
+
+/// CDXC:Browser 2026-10-10 WHY:
+/// Handing an app link to the OS from `on_protocol_execution` still commits Chromium's
+/// ERR_UNKNOWN_URL_SCHEME page in the frame (linear.app redirecting a Browser tab to `linear://`
+/// when Linear's "Open in desktop app" is on), so every request handler's `on_before_browse` asks
+/// here first: the navigation is cancelled, the frame keeps what it showed, and the app prompts as
+/// before. A Browser tab that had loaded no page yet was opened only for that link, so it closes
+/// once the prompt is done with, as Chrome does (`page_metadata_handler` is Browser tabs only).
+/// True when the navigation was such a link and must be cancelled.
+pub(crate) fn cancel_external_app_navigation(
+    browser: Option<&mut cef::Browser>,
+    frame: Option<&mut Frame>,
+    request: Option<&mut Request>,
+    page_metadata_handler: Option<&BrowserPageMetadataHandler>,
+) -> bool {
+    let url = request
+        .map(|request| CefString::from(&request.url()).to_string())
+        .unwrap_or_default();
+    let Some(scheme) = external_app_link_scheme(&url) else {
+        return false;
+    };
+    let is_main_frame = frame.is_none_or(|frame| frame.is_main() != 0);
+    let has_document = browser
+        .as_deref()
+        .is_some_and(|browser| browser.has_document() != 0);
+    let close_link_only_tab = page_metadata_handler
+        .filter(|_| is_main_frame && !has_document)
+        .cloned();
+    dispatch_browser_site_request(BrowserSiteRequest::OpenExternalApp(
+        BrowserExternalAppRequest {
+            url,
+            scheme,
+            origin: browser_page_origin(browser),
+            close_link_only_tab,
         },
     ));
     true
@@ -192,6 +242,7 @@ wrap_task! {
                     url: self.url.clone(),
                     scheme: self.scheme.clone(),
                     origin: self.origin.clone(),
+                    close_link_only_tab: None,
                 },
             ));
         }
@@ -252,6 +303,17 @@ wrap_request_handler! {
     pub(crate) struct GhostexGpuiExternalAppRequestHandler;
 
     impl RequestHandler {
+        fn on_before_browse(
+            &self,
+            browser: Option<&mut cef::Browser>,
+            frame: Option<&mut Frame>,
+            request: Option<&mut Request>,
+            _user_gesture: c_int,
+            _is_redirect: c_int,
+        ) -> c_int {
+            cancel_external_app_navigation(browser, frame, request, None) as c_int
+        }
+
         fn resource_request_handler(
             &self,
             _browser: Option<&mut cef::Browser>,

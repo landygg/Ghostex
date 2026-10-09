@@ -182,10 +182,24 @@ pub(crate) fn read_work_item(
             _ => None,
         });
 
+    // A PR's tickets (pull_request_tickets.rs): the ones known here now, the rest once it is read.
+    let mut pr_tickets = match item_ref {
+        WorkItemRef::PullRequest(selector) => pull_request_tickets_known_locally(
+            selector,
+            project.and_then(|input| input.repo.as_deref()),
+            item.as_ref(),
+            projects,
+        ),
+        _ => Vec::new(),
+    };
+    // The item the ticket facts and the team's data are about: a PR's ticket when it has one.
+    let ticket_ref = pr_tickets.first().cloned();
+    let ticket_ref = ticket_ref.as_ref().unwrap_or(item_ref);
+
     // A Work workspace's team: the ticket's Slack threads, working thread and team sessions.
     let team_ticket = project.and_then(|input| {
         let repo = input.repo.as_deref().map(str::to_ascii_lowercase);
-        let ticket = match item_ref {
+        let ticket = match ticket_ref {
             WorkItemRef::Linear(identifier) => Some(identifier.clone()),
             WorkItemRef::GithubIssue(number) => repo.map(|repo| format!("{repo}#{number}")),
             WorkItemRef::PullRequest(selector) => pull_request_url_parts(selector)
@@ -208,7 +222,7 @@ pub(crate) fn read_work_item(
                 crate::team_sync::read_team_ticket(paths, workspace_id, ticket, force)
             })
         });
-        let linear_task = match (item_ref, linear_key.as_deref()) {
+        let linear_task = match (ticket_ref, linear_key.as_deref()) {
             (WorkItemRef::Linear(identifier), Some(api_key)) => {
                 let identifier = identifier.clone();
                 let api_key = api_key.to_string();
@@ -222,7 +236,7 @@ pub(crate) fn read_work_item(
             }
             _ => None,
         };
-        let issue_task = match (item_ref, cwd.as_deref(), gh) {
+        let issue_task = match (ticket_ref, cwd.as_deref(), gh) {
             (WorkItemRef::GithubIssue(number), Some(cwd), true) => {
                 let number = *number;
                 let cwd = cwd.to_string();
@@ -299,6 +313,76 @@ pub(crate) fn read_work_item(
         }
     });
 
+    if let (WorkItemRef::PullRequest(_), Some(pr)) = (item_ref, pull_request.as_ref()) {
+        let mut team_keys: Vec<String> = plan
+            .linear
+            .iter()
+            .flat_map(|request| request.team_keys.iter().cloned())
+            .collect();
+        team_keys.extend(
+            linear_key
+                .as_deref()
+                .map(linear_key_fingerprint)
+                .and_then(cached_linear_team_keys)
+                .unwrap_or_default(),
+        );
+        for ticket in pull_request_branch_tickets(pr, &team_keys) {
+            push_ticket(&mut pr_tickets, ticket);
+        }
+        // Only adds tickets; a failed read leaves the ones found above.
+        if let (Some(api_key), Some(url)) =
+            (linear_key.as_deref(), pr.get("url").and_then(Value::as_str))
+        {
+            let attached = cached_detail(
+                format!("linear-attached:{}:{url}", linear_key_fingerprint(api_key)),
+                force,
+                || linear_issues_attached_to_url(api_key, url).map(|ids| json!(ids)),
+            );
+            for identifier in attached
+                .ok()
+                .as_ref()
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .filter_map(Value::as_str)
+            {
+                push_ticket(&mut pr_tickets, WorkItemRef::Linear(identifier.to_string()));
+            }
+        }
+        // No ticket was known before the PR was read: read the first one it names now.
+        if matches!(ticket_ref, WorkItemRef::PullRequest(_)) {
+            match pr_tickets.first() {
+                Some(WorkItemRef::Linear(identifier)) => {
+                    if let Some(api_key) = linear_key.as_deref() {
+                        match cached_detail(
+                            format!("linear:{}:{identifier}", linear_key_fingerprint(api_key)),
+                            force,
+                            || fetch_linear_issue_detail(api_key, identifier),
+                        ) {
+                            Ok(value) => linear = Some(value),
+                            Err(error) => errors.push(format!("Linear: {error}")),
+                        }
+                    }
+                }
+                Some(WorkItemRef::GithubIssue(number)) => {
+                    if let (Some(cwd), true) = (cwd.as_deref(), gh) {
+                        match cached_detail(format!("issue:{cwd}#{number}"), force, || {
+                            fetch_github_issue_detail(cwd, *number)
+                        }) {
+                            Ok(value) => github_issue = Some(value),
+                            Err(error) => errors.push(format!("GitHub: {error}")),
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+    let ticket_ref = match (ticket_ref, pr_tickets.first()) {
+        (WorkItemRef::PullRequest(_), Some(ticket)) => ticket,
+        _ => ticket_ref,
+    };
+
     // A ticket the list does not have (closed, or someone else's team): its row from the details.
     if item.is_none() {
         item = synthesized_item(
@@ -365,7 +449,7 @@ pub(crate) fn read_work_item(
         .unwrap_or_default();
     let team = team.map(|team| team_for_page(team, &local_sessions));
     let mut facts = team_flow_facts(
-        item_ref,
+        ticket_ref,
         local_sessions.len(),
         linear.as_ref(),
         github_issue.as_ref(),
@@ -400,6 +484,7 @@ pub(crate) fn read_work_item(
         "linear": linear,
         "githubIssue": github_issue,
         "pullRequest": pull_request,
+        "tickets": pr_tickets.iter().map(work_item_ref_label).collect::<Vec<_>>(),
         "media": media,
         "links": links,
         "teamFlow": { "source": source, "steps": evaluate_team_flow(&steps, &facts) },
@@ -407,6 +492,15 @@ pub(crate) fn read_work_item(
         "projects": list.get("projects").cloned().unwrap_or(Value::Array(Vec::new())),
         "errors": errors,
     })
+}
+
+/// `SPX-1245` or `#218`, as the team flow's ticket step names it.
+fn work_item_ref_label(ticket: &WorkItemRef) -> String {
+    match ticket {
+        WorkItemRef::Linear(identifier) => identifier.clone(),
+        WorkItemRef::GithubIssue(number) => format!("#{number}"),
+        WorkItemRef::PullRequest(selector) => selector.clone(),
+    }
 }
 
 fn synthesized_item(

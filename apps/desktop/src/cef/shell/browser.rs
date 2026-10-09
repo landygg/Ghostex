@@ -222,9 +222,12 @@ impl CefBrowser {
             .or_else(|| {
                 // Browser panes and project website views use the same shell popup
                 // route for middle-click and Cmd/Ctrl-click links.
-                popup_open_handler
-                    .clone()
-                    .map(GhostexGpuiBrowserRequestHandler::new)
+                popup_open_handler.clone().map(|popup_open_handler| {
+                    GhostexGpuiBrowserRequestHandler::new(
+                        popup_open_handler,
+                        page_metadata_handler.clone(),
+                    )
+                })
             })
             // Every other page still hands app links to the OS (site_requests.rs).
             .or_else(|| Some(GhostexGpuiExternalAppRequestHandler::new()));

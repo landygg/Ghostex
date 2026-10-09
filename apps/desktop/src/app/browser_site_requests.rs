@@ -153,10 +153,13 @@ async fn ask(message: &str, detail: &str, answers: &[&str], cx: &mut AsyncApp) -
     answer.await.ok()
 }
 
-/// `acme.okta.com` from `https://acme.okta.com`.
+/// `acme.okta.com` from `https://acme.okta.com` (Local Network Access hands over `https://linear.app/`).
 fn site_label(origin: &str) -> String {
-    match origin.split_once("://") {
-        Some((_, authority)) if !authority.is_empty() => authority.to_string(),
+    match origin
+        .split_once("://")
+        .map(|(_, rest)| rest.trim_end_matches('/'))
+    {
+        Some(authority) if !authority.is_empty() => authority.to_string(),
         _ => "This page".to_string(),
     }
 }
