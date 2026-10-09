@@ -6,7 +6,8 @@ use tokio::sync::Mutex;
 use crate::{events::GxserverEventHub, logging::GxserverLogger, paths::GxserverPaths};
 
 pub(super) const DEFAULT_REPOSITORY_HOST: &str = "github.com";
-pub(super) const REPOSITORY_CLONE_TIMEOUT_MS: u64 = 30 * 60_000;
+/// A clone is stopped after this long without new git progress output.
+pub(super) const REPOSITORY_CLONE_TIMEOUT_MS: u64 = 10 * 60_000;
 pub(super) const REPOSITORY_CLONE_OUTPUT_LIMIT_BYTES: usize = 4 * 1024 * 1024;
 
 #[derive(Debug, Clone)]

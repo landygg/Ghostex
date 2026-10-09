@@ -224,9 +224,12 @@ impl Mock {
                 let polls = self.polls.entry(job_id.clone()).or_insert(0);
                 *polls += 1;
                 if *polls <= options.running_polls {
-                    return Ok(
-                        json!({ "job": { "jobId": job_id, "message": "Receiving objects", "state": "running" } }),
-                    );
+                    return Ok(json!({ "job": {
+                            "jobId": job_id,
+                            "message": "Cloning repository.",
+                            "progress": "Receiving objects:  45% (12345/27434), 1.21 GiB | 11.30 MiB/s",
+                            "state": "running",
+                        } }));
                 }
                 let path = self.destinations.get(&job_id).cloned().unwrap_or_default();
                 Ok(

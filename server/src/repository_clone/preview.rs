@@ -153,7 +153,8 @@ pub(super) fn preview_repository_clone(
 }
 
 pub(super) fn build_repository_clone_git_args(preview: &Value) -> Vec<String> {
-    let mut args = vec!["clone".to_string()];
+    // `--progress` keeps git's meter on although stderr is a pipe (clone_process.rs publishes it).
+    let mut args = vec!["clone".to_string(), "--progress".to_string()];
     if let Some(branch) = preview.get("branchName").and_then(Value::as_str) {
         args.extend(["--branch".to_string(), branch.to_string()]);
     }
@@ -171,6 +172,7 @@ pub(super) fn build_repository_clone_git_args(preview: &Value) -> Vec<String> {
     {
         args.extend(["--depth".to_string(), "1".to_string()]);
     }
+    args.push("--".to_string());
     args.push(
         preview
             .get("cloneUrl")

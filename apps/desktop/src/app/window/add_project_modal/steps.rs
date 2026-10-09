@@ -161,7 +161,9 @@ impl GpuiAddProjectModalWindow {
                     .as_ref()
                     .map(|machine| machine.machine_id.as_str()),
             ),
-            None => ensure_browse_directory_path(&initial_browse_query(d_machine.as_ref())),
+            None => {
+                ensure_browse_directory_path(&initial_clone_destination_query(d_machine.as_ref()))
+            }
         };
         self.browse_generation += 1;
     }

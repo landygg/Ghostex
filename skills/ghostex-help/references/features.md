@@ -2221,7 +2221,9 @@ project starts in folder. Copied `git clone`, `gh repo clone`, and
 Repository file links identify the repository; unambiguous branch links
 also prefill the branch. Registered paths offer Open existing project, and
 files inside a Git repository offer its root. Press Enter to continue,
-choose a destination, and review before Clone & Add.
+choose a destination (on a Windows PowerShell machine the folder list starts at
+your drives), and review before Clone & Add. While it clones, the dialog shows
+Git's progress and a Cancel clone link.
 
 Project headers show the branch and diff stats; the header’s Commit (Git) menu offers
 commit, sync with main, PR review by a prompt agent, and related actions with

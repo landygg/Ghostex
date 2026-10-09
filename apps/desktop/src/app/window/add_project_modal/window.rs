@@ -305,6 +305,8 @@ pub(crate) struct GpuiAddProjectModalWindow {
     /// `None` means "not naming a folder"; the query keeps the listing's directory meanwhile.
     pub(super) new_folder_name: Option<String>,
     pub(super) clone_job_id: Option<String>,
+    /// The running clone's latest git progress line (`Receiving objects: 45% …`).
+    pub(super) clone_progress: Option<String>,
     pub(super) path_input: Entity<InputState>,
     pub(super) branch_input: Entity<InputState>,
     pub(super) list_scroll: ScrollHandle,
@@ -420,6 +422,7 @@ impl GpuiAddProjectModalWindow {
             tool_install: None,
             new_folder_name: None,
             clone_job_id: None,
+            clone_progress: None,
             path_input,
             branch_input,
             list_scroll: ScrollHandle::new(),
@@ -679,6 +682,10 @@ impl GpuiAddProjectModalWindow {
             let _ = this.update(cx, |this, cx| {
                 if this.busy_generation == generation && this.busy.is_some() {
                     this.is_slow = true;
+                    // The clone's notice sits under the options; bring it into view.
+                    if this.busy == Some(Busy::Clone) {
+                        this.review_scroll.scroll_to_bottom();
+                    }
                     cx.notify();
                 }
             });
@@ -887,6 +894,14 @@ impl GpuiAddProjectModalWindow {
     ) {
         match job.state {
             AddProjectCloneJobState::Running => {
+                if job.progress.is_some() {
+                    // The progress line sits under the options; bring it into view once.
+                    if self.clone_progress.is_none() {
+                        self.review_scroll.scroll_to_bottom();
+                    }
+                    self.clone_progress = job.progress;
+                    cx.notify();
+                }
                 let delay = self.clone_job_poll_interval;
                 cx.spawn(async move |this, cx| {
                     cx.background_executor().timer(delay).await;
@@ -935,6 +950,7 @@ impl GpuiAddProjectModalWindow {
             self.error = error;
         }
         self.clone_job_id = None;
+        self.clone_progress = None;
         self.set_busy(None, cx);
         cx.notify();
     }

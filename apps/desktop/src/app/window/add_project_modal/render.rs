@@ -430,7 +430,7 @@ impl GpuiAddProjectModalWindow {
     pub(super) fn render_slow_notice(
         &self,
         skin: &AddProjectSkin,
-        text: &'static str,
+        text: impl Into<gpui::SharedString>,
         cx: &mut Context<Self>,
     ) -> gpui::Div {
         let cloning = self.busy == Some(Busy::Clone);
@@ -446,11 +446,20 @@ impl GpuiAddProjectModalWindow {
             .text_size(px(14.0))
             .line_height(px(20.0))
             .text_color(hsla(skin.muted()))
-            .child(text)
+            .child(
+                div()
+                    .flex_1()
+                    .min_w_0()
+                    .overflow_hidden()
+                    .whitespace_nowrap()
+                    .text_ellipsis()
+                    .child(text.into()),
+            )
             .when(cloning && self.clone_job_id.is_some(), |this| {
                 this.child(
                     div()
                         .id("add-project-cancel-clone")
+                        .flex_shrink_0()
                         .underline()
                         .cursor_pointer()
                         .hover(move |this| this.text_color(hsla(fg)))

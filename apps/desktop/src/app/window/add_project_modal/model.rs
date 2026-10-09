@@ -336,6 +336,8 @@ pub(crate) enum AddProjectCloneJobState {
 pub(crate) struct AddProjectCloneJob {
     pub(crate) error: Option<String>,
     pub(crate) message: Option<String>,
+    /// git's latest progress line while the job runs.
+    pub(crate) progress: Option<String>,
     pub(crate) project_path: Option<String>,
     pub(crate) state: AddProjectCloneJobState,
 }
@@ -354,6 +356,7 @@ pub(crate) fn read_add_project_clone_job(value: &Value) -> Result<AddProjectClon
     Ok(AddProjectCloneJob {
         error: text(job, "error"),
         message: text(job, "message"),
+        progress: text(job, "progress"),
         project_path: text(job, "projectPath"),
         state,
     })

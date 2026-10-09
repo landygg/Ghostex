@@ -195,11 +195,10 @@ async fn run_clone_job(
                     &jobs,
                     &runtime,
                     &job_id,
-                    output
-                        .stderr
-                        .clone()
-                        .or_else(&output.stdout)
-                        .or_else(&format!("git clone exited {}.", output.exit_code)),
+                    summarize_clone_failure(
+                        &output.stderr.clone().or_else(&output.stdout),
+                        output.exit_code,
+                    ),
                     Some(output),
                     "dependencyUnavailable",
                 )

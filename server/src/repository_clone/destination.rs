@@ -1,7 +1,7 @@
 #[cfg(test)]
 use std::{collections::HashMap, sync::Arc, time::Duration};
 use std::{
-    env, fs,
+    fs,
     path::{Path, PathBuf},
 };
 
@@ -114,18 +114,26 @@ fn expand_user_path(input: &str) -> PathBuf {
     PathBuf::from(input)
 }
 
+/// Windows usually has USERPROFILE and no HOME; same home as Add Project's registration.
 fn home_dir() -> PathBuf {
-    env::var_os("HOME")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("."))
+    ghostex_paths::GhostexPaths::resolve().home_dir
 }
 
+/// CDXC:AddProject 2026-10-09 WHY: the root is the platform separator, never a literal `/`: on
+/// native Windows `/` after the `c:` prefix produced `c:/dev\cozy-studio`, which the review
+/// step showed and the cloned project was registered under. Drive letters are upper-cased so a
+/// typed `c:` matches the `C:\` paths Windows itself reports.
 pub(super) fn normalize_path_string(path: impl AsRef<Path>) -> String {
     let mut normalized = PathBuf::new();
     for component in path.as_ref().components() {
         match component {
-            std::path::Component::Prefix(prefix) => normalized.push(prefix.as_os_str()),
-            std::path::Component::RootDir => normalized.push(Path::new("/")),
+            std::path::Component::Prefix(prefix) => match prefix.kind() {
+                std::path::Prefix::Disk(letter) => {
+                    normalized.push(format!("{}:", letter.to_ascii_uppercase() as char))
+                }
+                _ => normalized.push(prefix.as_os_str()),
+            },
+            std::path::Component::RootDir => normalized.push(component.as_os_str()),
             std::path::Component::CurDir => {}
             std::path::Component::ParentDir => {
                 if !normalized.pop() {

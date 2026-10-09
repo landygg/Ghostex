@@ -14,6 +14,8 @@ use gpui_component::{Sizable as _, Size as ComponentSize, h_flex, v_flex};
 
 /// `leading-relaxed` on 14px text.
 const RELAXED_LINE: f32 = 22.75;
+/// Below this the two clone option cards stack instead of sharing the row.
+const OPTION_CARD_MIN_WIDTH: f32 = 220.0;
 
 impl GpuiAddProjectModalWindow {
     /// A review card (`border border-border/60 bg-muted/15 px-3 py-2.5`): icon, label, a
@@ -84,7 +86,7 @@ impl GpuiAddProjectModalWindow {
             })
             .track_focus(&handle)
             .flex_1()
-            .flex_basis(px(0.0))
+            .flex_basis(px(OPTION_CARD_MIN_WIDTH))
             .min_w_0()
             .items_start()
             .gap(px(10.0))
@@ -105,8 +107,10 @@ impl GpuiAddProjectModalWindow {
                     .when(disabled, |this| this.opacity(0.5))
                     .child(square_checkbox(skin, checked, focused)),
             )
+            // Without `flex_1` the column collapses to zero width and wraps one letter per line.
             .child(
                 v_flex()
+                    .flex_1()
                     .min_w_0()
                     .child(
                         text_sm(div())
@@ -447,11 +451,22 @@ impl GpuiAddProjectModalWindow {
             .child(
                 h_flex()
                     .mt(px(12.0))
+                    .flex_wrap()
                     .gap(px(8.0))
                     .items_stretch()
                     .child(main_only)
                     .child(shallow),
             );
+        // git's own progress line once the job reports one; the slow notice before that.
+        let clone_notice = match (self.busy == Some(Busy::Clone), self.clone_progress.clone()) {
+            (true, Some(progress)) => Some(self.render_slow_notice(skin, progress, cx)),
+            (true, None) if self.is_slow => Some(self.render_slow_notice(
+                skin,
+                "Still cloning. The machine may be reconnecting.",
+                cx,
+            )),
+            _ => None,
+        };
         let content = v_flex()
             .w_full()
             .flex_shrink_0()
@@ -470,10 +485,7 @@ impl GpuiAddProjectModalWindow {
                     .as_ref()
                     .map(|error| error_region(skin, error).into_any_element()),
             )
-            .children((self.is_slow && self.busy == Some(Busy::Clone)).then(|| {
-                self.render_slow_notice(skin, "Still cloning. The machine may be reconnecting.", cx)
-                    .into_any_element()
-            }));
+            .children(clone_notice);
         let can_clone = self.can_clone();
         let cloning = self.busy == Some(Busy::Clone);
         let back_button = self.footer_button(

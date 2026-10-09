@@ -194,6 +194,19 @@ pub(crate) fn initial_browse_query(machine: Option<&AddProjectMachineOption>) ->
         .to_string()
 }
 
+/// CDXC:AddProject 2026-10-09 DECISION:
+/// User: "when i have powershell selected don't default to ~/ you should default to showing all the drives instead please!" The clone destination step on a native Windows (PowerShell) machine opens at gxserver's drive list, like Local folder does; WSL and other hosts keep their home folder, and a configured base directory still wins.
+/// SEE-ALSO: derive.rs (the Local folder drive-list decision), server/src/server/project_paths.rs (the drive list).
+pub(crate) fn initial_clone_destination_query(machine: Option<&AddProjectMachineOption>) -> String {
+    let has_base_directory = machine
+        .and_then(|machine| machine.add_project_base_directory.as_deref())
+        .is_some_and(|directory| !directory.trim().is_empty());
+    if !has_base_directory && machine.is_some_and(|machine| machine.starts_at_drive_list) {
+        return ADD_PROJECT_ROOT_BROWSE_PATH.to_string();
+    }
+    initial_browse_query(machine)
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum AddProjectEmptyCloneStep {
     Repository,
