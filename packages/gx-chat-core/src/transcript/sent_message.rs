@@ -3,7 +3,7 @@
 //!
 //! CDXC:SessionChat 2026-09-30 DECISION:
 //! User: "when the current agent chat that i'm in sends a message to another agent can we add a small card that shows the message being sent when expanded? i want it collapsed by default", looking like the card a received message gets. The send's tool row turns into that card the way an answered question does: a run standing alone draws the card instead of the row, a heading's disclosure or a turn's work fold keeps the row, and a finished turn lifts its cards out of the "Worked for" fold.
-//! SEE-ALSO: agent_message.rs parses the received side; server/src/ghostex_cli/agents/delivery.rs prints the result JSON read here; apps/desktop/src/app/native_chat/inter_agent_message.rs and apps/mobile/app/src/chat/native/transcript/SystemRows.tsx draw both cards.
+//! SEE-ALSO: agent_message.rs parses the received side; sent_message_script.rs reads the message out of variables and decides NOT SENT; server/src/ghostex_cli/agents/delivery.rs prints the result JSON read here; apps/desktop/src/app/native_chat/inter_agent_message.rs and apps/mobile/app/src/chat/native/transcript/SystemRows.tsx draw both cards.
 
 use std::collections::HashMap;
 
@@ -15,7 +15,8 @@ use crate::transcript::jsstr::{ascii_lower, js_trim, last_path_segment};
 use crate::transcript::line_breaks::{agent_line_breaks, AgentLineBreaks};
 use crate::transcript::markdown_links::markdown_references;
 use crate::transcript::native_markdown::native_markdown;
-use crate::transcript::shell_script::{parse_shell, ShellCommand};
+use crate::transcript::sent_message_script::{Resolved, Script, SCRIPTED_BODY};
+use crate::transcript::shell_script::ShellCommand;
 use crate::transcript::tool_fold::ToolPair;
 use crate::transcript::tool_rows::is_command_tool;
 use crate::transcript::tool_summary::{command_detail, tool_file_path};
@@ -54,17 +55,19 @@ pub fn sent_agent_messages(pair: &ToolPair<'_>, written: &[(&str, &str)]) -> Vec
     if !command.contains("agents") {
         return Vec::new();
     }
-    let commands = parse_shell(&command);
-    let mut sent: Vec<SentAgentMessage> = commands
+    let script = Script::parse(&command, written);
+    let mut sent: Vec<(usize, SentAgentMessage)> = script
+        .commands
         .iter()
-        .filter_map(|shell| cli_send(shell, &commands, written))
+        .enumerate()
+        .filter_map(|(at, shell)| cli_send(shell, at, &script).map(|sent| (at, sent)))
         .collect();
     if sent.is_empty() {
-        return sent;
+        return Vec::new();
     }
     let output = pair.result_output().unwrap_or_default();
     let results = send_results(output);
-    for (index, message) in sent.iter_mut().enumerate() {
+    for (index, (at, message)) in sent.iter_mut().enumerate() {
         match results.get(index) {
             Some(result) => {
                 let recipient = result
@@ -86,13 +89,25 @@ pub fn sent_agent_messages(pair: &ToolPair<'_>, written: &[(&str, &str)]) -> Vec
                     message.session_title = title;
                 }
                 message.failed = result.get("ok") == Some(&Value::Bool(false));
+                // What the CLI echoes is what went out, whatever the script built it from.
+                let echoed = result
+                    .get("message")
+                    .or_else(|| result.get("task"))
+                    .and_then(Value::as_str)
+                    .map(js_trim)
+                    .unwrap_or_default();
+                if !echoed.is_empty() {
+                    message.body = echoed.to_string();
+                }
             }
-            // No result read back (the agent filtered it, or the call is still running): only the
-            // call's own failure says it did not go out.
-            None => message.failed = pair.result_is_error() && results.is_empty(),
+            // No result read back (the agent filtered it, or the call is still running).
+            None => {
+                message.failed =
+                    results.is_empty() && script.send_failed(output, pair.result_is_error(), *at)
+            }
         }
     }
-    sent
+    sent.into_iter().map(|(_, message)| message).collect()
 }
 
 /// Claude's `SendMessage`: `{to, message, summary}`. A structured `message` (a shutdown request,
@@ -120,11 +135,7 @@ fn claude_send_message(input: &Value, pair: &ToolPair<'_>) -> Option<SentAgentMe
 }
 
 /// One `ghostex agents send` or `ghostex agents create --task` in a script.
-fn cli_send(
-    shell: &ShellCommand,
-    script: &[ShellCommand],
-    written: &[(&str, &str)],
-) -> Option<SentAgentMessage> {
+fn cli_send(shell: &ShellCommand, at: usize, script: &Script<'_>) -> Option<SentAgentMessage> {
     let start = shell.words.windows(3).position(|words| {
         matches!(last_path_segment(&words[0]), "ghostex" | "gx")
             && words[1] == "agents"
@@ -157,62 +168,38 @@ fn cli_send(
             "--body-file" => body_file = words.next().map(String::as_str),
             "--task" => task = words.next().map(String::as_str),
             "--title" => title = words.next().map(String::as_str),
-            "--server" | "--project-id" => {
+            "--server" | "--project-id" | "--request-id" => {
                 words.next();
             }
             flag if flag.starts_with('-') => {}
             value => positional.push(value),
         }
     }
-    let target = positional.first().copied()?;
+    let target = match script.value(positional.first()?, at, shell) {
+        Resolved::Text(target) => target,
+        Resolved::Unknown => positional[0].to_string(),
+    };
     let body = if create {
-        task.map(str::to_string)
+        task
     } else {
-        positional.get(1).map(|body| body.to_string())
+        positional.get(1).copied()
     };
     let body = match (body, body_file) {
-        (Some(body), _) => body,
-        (None, Some(path)) => body_file_text(path, shell, script, written).unwrap_or_default(),
+        (Some(word), _) => match script.value(word, at, shell) {
+            Resolved::Text(body) => body,
+            Resolved::Unknown => SCRIPTED_BODY.to_string(),
+        },
+        (None, Some(path)) => script.file_text(path, shell).unwrap_or_default(),
         // `create` without a task starts an agent; it sends it nothing.
         (None, None) if create => return None,
         (None, None) => String::new(),
     };
     Some(SentAgentMessage {
-        target: target.to_string(),
+        target,
         session_title: title.unwrap_or_default().to_string(),
         body: js_trim(&body).to_string(),
         ..SentAgentMessage::default()
     })
-}
-
-/// What a `--body-file` held, when the same call or message wrote it.
-fn body_file_text(
-    path: &str,
-    send: &ShellCommand,
-    script: &[ShellCommand],
-    written: &[(&str, &str)],
-) -> Option<String> {
-    if matches!(path, "-" | "/dev/stdin") {
-        return send.heredoc.clone();
-    }
-    script
-        .iter()
-        .rev()
-        .find_map(|shell| {
-            let writes = match shell.words.first().map(String::as_str) {
-                Some("cat") => shell.stdout_file.as_deref() == Some(path),
-                Some("tee") => shell.words[1..].iter().any(|word| word == path),
-                _ => false,
-            };
-            writes.then(|| shell.heredoc.clone()).flatten()
-        })
-        .or_else(|| {
-            written
-                .iter()
-                .rev()
-                .find(|(file, _)| *file == path)
-                .map(|(_, content)| content.to_string())
-        })
 }
 
 /// The JSON objects `agents send` / `create` printed, in order. Other output (a `wake` line, a

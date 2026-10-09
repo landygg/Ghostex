@@ -226,10 +226,13 @@ impl NativeChatView {
                         heading.child(div().text_color(p.muted).child(detail))
                     }),
             )
+            // On the title's first line, centred on it like the chevron.
             .when_some(tag, |row, (tag, color)| {
                 row.child(
                     div()
-                        .mt(px(4.0 * s))
+                        .h(px(22.75 * s))
+                        .flex()
+                        .items_center()
                         .flex_shrink_0()
                         .text_size(px(11.0 * s))
                         .text_color(color)

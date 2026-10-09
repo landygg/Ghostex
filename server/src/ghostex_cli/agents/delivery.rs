@@ -143,6 +143,8 @@ pub(super) fn send(args: &Arguments) -> CliResult<Value> {
         "sender": identity::summary(&sender),
         "recipient": identity::summary(&recipient),
         "receipt": receipt,
+        // CDXC:SessionChat 2026-10-10 WHY: the sender's chat card shows this text; the command line often holds only `$msg` or a `--body-file` path (gx-chat-core sent_message_script.rs).
+        "message": body,
     }))
 }
 

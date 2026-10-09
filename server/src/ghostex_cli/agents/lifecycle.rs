@@ -114,6 +114,8 @@ pub(super) fn create(args: &Arguments) -> CliResult<Value> {
             "text": message, "startupSend": true, "sendRequestId": uuid::Uuid::new_v4().to_string(),
         }), &flags).map_err(|error| CliError::Other(format!("Created {reference}, but task delivery failed or is uncertain: {error}. Inspect this session and its queue; do not create another session to retry.")))?;
         result["taskStatus"] = json!("queued");
+        // The sender's chat card shows the task from here (see `message` in delivery.rs).
+        result["task"] = json!(body);
         result["receipt"] = super::delivery::receipt(&receipt);
     }
     Ok(result)
