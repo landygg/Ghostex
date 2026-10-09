@@ -222,7 +222,7 @@ impl GpuiInstallJob {
 fn job_command(script: &str) -> Command {
     #[cfg(target_os = "windows")]
     {
-        let mut command = Command::new("powershell.exe");
+        let mut command = gpui_background_command("powershell.exe");
         command.args([
             "-NoLogo",
             "-NoProfile",
@@ -234,8 +234,6 @@ fn job_command(script: &str) -> Command {
                 "$ProgressPreference = 'SilentlyContinue'; [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12; {script}"
             ),
         ]);
-        use std::os::windows::process::CommandExt;
-        command.creation_flags(0x0800_0000);
         command
     }
     #[cfg(not(target_os = "windows"))]

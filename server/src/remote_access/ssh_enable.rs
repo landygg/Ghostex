@@ -1,11 +1,10 @@
 use std::{
-    process::Command,
     thread,
     time::{Duration, Instant},
 };
 
 #[cfg(unix)]
-use std::process::Stdio;
+use std::process::{Command, Stdio};
 
 use serde::{Deserialize, Serialize};
 
@@ -280,13 +279,6 @@ exit 0
 #[cfg(windows)]
 fn run_privileged_enable() -> SshEnableResult {
     windows_enable::run()
-}
-
-/// CREATE_NO_WINDOW, so helper PowerShell processes never flash a console.
-#[cfg(windows)]
-pub(crate) fn hide_console_window(command: &mut Command) {
-    use std::os::windows::process::CommandExt;
-    command.creation_flags(0x0800_0000);
 }
 
 // Linux: the unit is `ssh` on Debian/Ubuntu and `sshd` on Fedora/RHEL/Arch,

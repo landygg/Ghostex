@@ -1,6 +1,5 @@
 use std::io::Write;
 use std::path::PathBuf;
-use std::process::Command;
 
 use crate::ghostex_cli::args::{multi_value_flag, parse_args, Flags};
 use crate::ghostex_cli::launchers;
@@ -224,7 +223,7 @@ fn install_ghostex_agent_skill(
         let launch = launchers::resolve_gxserver_cli_launch()?;
         let mut full_args = launch.args.clone();
         full_args.extend(gxserver_args);
-        let mut child = Command::new(&launch.command);
+        let mut child = crate::platform::process::background_command(&launch.command);
         child.args(&full_args);
         if let Some(cwd) = &launch.cwd {
             child.current_dir(cwd);

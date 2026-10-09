@@ -1,7 +1,4 @@
-use std::{
-    process::{Command, Stdio},
-    time::Instant,
-};
+use std::{process::Stdio, time::Instant};
 
 use anyhow::Result;
 
@@ -63,7 +60,7 @@ fn source_code_server_spawn_host_runtime(
         return Err("Source runtime startup timed out".to_string());
     }
 
-    let mut command = Command::new(&node_path);
+    let mut command = gpui_background_command(&node_path);
     command
         .arg("--eval")
         .arg(SOURCE_CODE_SERVER_OWNED_ENTRY)
@@ -103,8 +100,6 @@ fn source_code_server_spawn_host_runtime(
 
     #[cfg(windows)]
     {
-        use std::os::windows::process::CommandExt;
-        command.creation_flags(0x0800_0000);
         command
             .arg("--session-socket")
             .arg(source_code_server_native_session_socket(&user_data_dir));

@@ -1,7 +1,7 @@
 use std::{
     env, fs,
     path::{Path, PathBuf},
-    process::{Command, Stdio},
+    process::Stdio,
 };
 
 use serde::{Deserialize, Serialize};
@@ -57,7 +57,7 @@ pub fn read_tailscale_status() -> TailscaleStatus {
     let Some(binary) = resolve_tailscale_binary() else {
         return TailscaleStatus::not_installed();
     };
-    let output = Command::new(&binary)
+    let output = crate::platform::process::background_command(&binary)
         .args(["status", "--json"])
         .stdin(Stdio::null())
         .stdout(Stdio::piped())

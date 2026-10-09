@@ -464,7 +464,7 @@ pub fn run_android_readiness_check(flags: &Flags) -> Value {
 /// interactive shell, first stdout line or "".
 pub fn resolve_command_path(command: &str) -> String {
     let shell = launchers::resolve_cli_interactive_shell_launch();
-    let output = Command::new(&shell.executable)
+    let output = crate::platform::process::background_command(&shell.executable)
         .args([
             shell.command_flag.clone(),
             format!("command -v -- {}", launchers::shell_quote(command)),

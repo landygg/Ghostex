@@ -232,11 +232,6 @@ fn run_command(command: &mut Command, directory: &Path, timeout: Duration) -> Re
     let output_path = directory.join("build-output.txt");
     let output = File::create(&output_path)?;
     super::supervisor::configure_process_group(command);
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        command.creation_flags(0x0000_0200 | 0x0800_0000);
-    }
     let mut child = command
         .stdin(Stdio::null())
         .stdout(output.try_clone()?)

@@ -1,7 +1,7 @@
 use std::{
     env, fs,
     path::{Path, PathBuf},
-    process::{Command, Stdio},
+    process::Stdio,
     time::Duration,
 };
 
@@ -71,7 +71,7 @@ fn is_executable_file(path: &Path) -> bool {
 const VERSION_TIMEOUT: Duration = Duration::from_secs(5);
 
 pub fn read_tailcat_binary_version(binary_path: &Path) -> Option<String> {
-    let mut child = Command::new(binary_path)
+    let mut child = crate::platform::process::background_command(binary_path)
         .arg("version")
         .stdin(Stdio::null())
         .stdout(Stdio::piped())

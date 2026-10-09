@@ -8,11 +8,8 @@ use std::{
     process::{Child, Command, Stdio},
 };
 
-use std::os::windows::process::CommandExt as _;
-
 use super::*;
 
-const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 const WSL_STORAGE_PATHS_SCRIPT: &str = r#"set -eu
 case "${GHOSTEX_HOME:-}" in
     /*)
@@ -473,9 +470,7 @@ fn decode_windows_command_output(bytes: &[u8]) -> String {
 }
 
 pub(super) fn hidden_command(program: &str) -> Command {
-    let mut command = Command::new(program);
-    command.creation_flags(CREATE_NO_WINDOW);
-    command
+    crate::app::helpers::gpui_background_command(program)
 }
 
 pub(super) fn posix_single_quote(value: &str) -> String {

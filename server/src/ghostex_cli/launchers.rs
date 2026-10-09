@@ -325,9 +325,9 @@ pub fn run_interactive_process(
     let mut child = Command::new(command);
     #[cfg(windows)]
     {
-        use std::{io::IsTerminal, os::windows::process::CommandExt};
+        use std::io::IsTerminal;
         if !std::io::stdin().is_terminal() && !std::io::stdout().is_terminal() {
-            child.creation_flags(0x0800_0000);
+            crate::platform::process::NoConsoleWindow::no_console_window(&mut child);
         }
     }
     child.args(args);

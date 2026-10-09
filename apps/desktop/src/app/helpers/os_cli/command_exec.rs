@@ -6,8 +6,16 @@ use std::{
 
 use anyhow::Result;
 
-/// CDXC:PlatformSupport 2026-09-24 WHY:
-/// Piped output alone does not suppress Windows console windows. Background probes and RPC helpers must opt out when creating the process, before a console can flash on screen.
+/// The child gets a console of its own that is never shown.
+#[cfg(windows)]
+pub(crate) const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+/// The child leads its own Ctrl+C group.
+#[cfg(windows)]
+pub(crate) const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
+
+/// CDXC:PlatformSupport 2026-10-09 WHY:
+/// The desktop app is a GUI program with no console, so every console program it starts (wsl, PowerShell, git, node, the `ghostex` CLI, gxserver) gets a fresh console, which Windows Terminal (the default terminal on Windows 11) shows as a window that flashes on the user's screen. Piped output does not stop it and `-WindowStyle Hidden` hides it only after it has appeared, so every background start opts out with CREATE_NO_WINDOW when the process is created, through this one helper (or its constants when a start needs more flags). Starts the user asked to see (installers, an editor or app they chose, Explorer) do not use it.
+/// SEE-ALSO: `NoConsoleWindow` in server/src/platform/process.rs, the same rule for gxserver and the `ghostex` CLI.
 pub(crate) fn gpui_background_command(
     program: impl AsRef<std::ffi::OsStr>,
 ) -> std::process::Command {
@@ -15,7 +23,7 @@ pub(crate) fn gpui_background_command(
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
-        process.creation_flags(0x0800_0000);
+        process.creation_flags(CREATE_NO_WINDOW);
     }
     #[cfg(not(windows))]
     let _ = &mut process;

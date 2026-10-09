@@ -540,12 +540,7 @@ pub(crate) fn source_code_server_node_major(node_path: &Path) -> Option<u64> {
     if !node_path.is_file() {
         return None;
     }
-    let mut command = Command::new(node_path);
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        command.creation_flags(0x0800_0000);
-    }
+    let mut command = crate::app::helpers::gpui_background_command(node_path);
     let output = command
         .arg("-v")
         .stdin(Stdio::null())
@@ -823,12 +818,7 @@ fn source_code_server_open_file_on_host(
     let session_socket = user_data_dir.join("code-server-ipc.sock");
     #[cfg(windows)]
     let session_socket = source_code_server_native_session_socket(&user_data_dir);
-    let mut command = Command::new(&node_path);
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        command.creation_flags(0x0800_0000);
-    }
+    let mut command = crate::app::helpers::gpui_background_command(&node_path);
     command
         .arg(&entrypoint_path)
         .arg("--user-data-dir")

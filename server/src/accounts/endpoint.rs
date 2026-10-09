@@ -126,7 +126,7 @@ pub(crate) fn dispatch(
                 .ok_or_else(|| {
                     DomainStateError::bad_request("Install the account helper first.")
                 })?;
-            let output = std::process::Command::new(binary)
+            let output = crate::platform::process::background_command(binary)
                 .args(["swap", &first.selector, &second.selector])
                 .stdin(std::process::Stdio::null())
                 .output()

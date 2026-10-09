@@ -147,12 +147,7 @@ pub(super) fn zmx_prompt_editor_capability() -> Option<String> {
 
 /// execFileAsync(zmx, ["prompt-editor-capability"], { timeout: 750 }).
 pub(super) fn run_zmx_capability_probe(command: &str) -> Option<String> {
-    let mut probe = Command::new(command);
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        probe.creation_flags(0x0800_0000);
-    }
+    let mut probe = crate::platform::process::background_command(command);
     let mut child = probe
         .arg("prompt-editor-capability")
         .stdin(Stdio::null())

@@ -241,12 +241,12 @@ pub(crate) fn gpui_prewarm_ghostex_editor_daemon() {
             .arg(gpui_ghostex_editor_socket_path());
         command.process_group(0);
     }
+    // Not DETACHED_PROCESS: Windows ignores CREATE_NO_WINDOW next to it, and a daemon with no console opens a visible one for every console program it starts.
     #[cfg(windows)]
     {
+        use crate::app::helpers::{CREATE_NEW_PROCESS_GROUP, CREATE_NO_WINDOW};
         use std::os::windows::process::CommandExt as _;
-        const DETACHED_PROCESS: u32 = 0x00000008;
-        const CREATE_NO_WINDOW: u32 = 0x08000000;
-        command.creation_flags(DETACHED_PROCESS | CREATE_NO_WINDOW);
+        command.creation_flags(CREATE_NEW_PROCESS_GROUP | CREATE_NO_WINDOW);
     }
     let _ = command.spawn();
 }

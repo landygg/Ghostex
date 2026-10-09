@@ -287,12 +287,7 @@ pub(crate) fn run_command_stdout_with_timeout(
     mut command: Command,
     timeout: Duration,
 ) -> Option<String> {
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        command.creation_flags(0x08000000);
-    }
-    command
+    crate::platform::process::NoConsoleWindow::no_console_window(&mut command)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::null());

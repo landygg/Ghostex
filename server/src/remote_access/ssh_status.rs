@@ -264,7 +264,7 @@ fn read_command_first_line(program: &str, args: &[&str]) -> Option<String> {
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::null());
-    super::ssh_enable::hide_console_window(&mut command);
+    crate::platform::process::NoConsoleWindow::no_console_window(&mut command);
     let output = command.output().ok()?;
     if !output.status.success() {
         return None;

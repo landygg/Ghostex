@@ -7,7 +7,9 @@ use std::{
 use serde_json::{json, Map, Value};
 use tokio::{process::Command, time::timeout};
 
-use crate::repository_clone::canonical_repository_lookup_url;
+use crate::{
+    platform::process::NoConsoleWindow, repository_clone::canonical_repository_lookup_url,
+};
 
 /*
 CDXC:AddProject 2026-07-30:
@@ -564,9 +566,8 @@ async fn run_probe(
         .stderr(std::process::Stdio::piped())
         .env("GH_PROMPT_DISABLED", "1")
         .env("GH_NO_UPDATE_NOTIFIER", "1")
-        .env("GIT_TERMINAL_PROMPT", "0");
-    #[cfg(windows)]
-    command.creation_flags(0x0800_0000);
+        .env("GIT_TERMINAL_PROMPT", "0")
+        .no_console_window();
     let child = command
         .spawn()
         .map_err(|_| format!("`{executable}` was not found on the server PATH."))?;

@@ -1,3 +1,4 @@
+use crate::platform::process::NoConsoleWindow;
 use std::{
     collections::BTreeMap,
     path::{Path, PathBuf},
@@ -44,8 +45,7 @@ fn command(script: &str, home: &Path, env: &BTreeMap<String, String>) -> Command
     let mut command = Command::new(&shell.executable);
     #[cfg(unix)]
     command.process_group(0);
-    #[cfg(windows)]
-    command.creation_flags(0x0800_0000);
+    command.no_console_window();
     /*
     CDXC:AgentProviders 2026-09-28 WHY:
     A fresh Windows keeps the Restricted execution policy, which refuses npm's `npm.ps1` shim and scripts an installer starts, so the job runs with a process-scoped Bypass as the installers' own instructions do. `$ErrorActionPreference = 'Stop'` is not set around the command: it leaks into `irm … | iex` vendor scripts and turned Cursor's harmless `Get-WmiObject` warning into an abort after its installer had already deleted the previous install. A terminating error (a failed download) or a non-zero exit code fails the job, and every job is re-checked afterwards. Progress bars are off (they slow downloads in 5.1), TLS 1.2 is forced for 5.1, and output is UTF-8 so installer check marks survive.
@@ -130,8 +130,7 @@ pub(crate) async fn run_executable(
     let mut command = Command::new(executable);
     #[cfg(unix)]
     command.process_group(0);
-    #[cfg(windows)]
-    command.creation_flags(0x0800_0000);
+    command.no_console_window();
     #[cfg(windows)]
     command.env("PATH", crate::platform::live_path::value());
     command
@@ -169,7 +168,7 @@ async fn wait(
         #[cfg(windows)]
         if let Some(pid) = pid {
             let mut kill = Command::new("taskkill.exe");
-            kill.creation_flags(0x0800_0000);
+            kill.no_console_window();
             let _ = kill
                 .args(["/PID", &pid.to_string(), "/T", "/F"])
                 .output()

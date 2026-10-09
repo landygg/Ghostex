@@ -750,6 +750,13 @@ fn spawn_ghostex_editor_daemon(executable: &str) {
             Ok(())
         });
     }
+    // Its own hidden console, so it outlives the terminal that ran the CLI without opening a window.
+    #[cfg(windows)]
+    {
+        use crate::platform::process::{CREATE_NEW_PROCESS_GROUP, CREATE_NO_WINDOW};
+        use std::os::windows::process::CommandExt;
+        command.creation_flags(CREATE_NEW_PROCESS_GROUP | CREATE_NO_WINDOW);
+    }
     // child.once("error", () => undefined); child.unref();
     let _ = command.spawn();
 }

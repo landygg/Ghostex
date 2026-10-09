@@ -90,11 +90,6 @@ fn installed_pi_supports_session_id() -> bool {
     };
     let mut command = std::process::Command::new(program);
     command.arg("--version").current_dir(&home);
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        command.creation_flags(0x08000000);
-    }
     let Some(version) = crate::agent_hooks::probing::run_command_stdout_with_timeout(
         command,
         Duration::from_secs(3),

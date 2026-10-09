@@ -1,16 +1,42 @@
 use std::{ffi::OsStr, process::Command};
 
-/// CDXC:PlatformSupport 2026-09-14 WHY:
-/// Background Git and tool probes run in the interactive Windows session; without CREATE_NO_WINDOW every probe can open Windows Terminal.
+/// The child gets a console of its own that is never shown.
+#[cfg(windows)]
+pub(crate) const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+/// The child leads its own Ctrl+C group, so a console signal to the parent does not reach it.
+#[cfg(windows)]
+pub(crate) const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
+
+/// CDXC:PlatformSupport 2026-10-09 WHY:
+/// Every console program Ghostex starts for its own work (git, gh, wmx helpers, PowerShell probes, agent CLIs, tailcat) runs in the user's desktop session. A console program whose parent has no console (the desktop app is a GUI program; a daemon started without one) gets a fresh console, and with Windows Terminal as the default terminal that console opens as a Terminal window that flashes on the user's screen; `-WindowStyle Hidden` hides it only after it has appeared, and piping the output does not stop it. So every background start opts out when the process is created, through this one helper. Starts the user asked to see (UAC prompts, installers, an editor or terminal they opened) do not use it.
+pub(crate) trait NoConsoleWindow {
+    /// Starts the child with CREATE_NO_WINDOW on Windows; a no-op elsewhere. `creation_flags` replaces earlier flags, so a caller that needs more passes `CREATE_NO_WINDOW | …` itself.
+    fn no_console_window(&mut self) -> &mut Self;
+}
+
+impl NoConsoleWindow for Command {
+    fn no_console_window(&mut self) -> &mut Self {
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt;
+            self.creation_flags(CREATE_NO_WINDOW);
+        }
+        self
+    }
+}
+
+impl NoConsoleWindow for tokio::process::Command {
+    fn no_console_window(&mut self) -> &mut Self {
+        #[cfg(windows)]
+        self.creation_flags(CREATE_NO_WINDOW);
+        self
+    }
+}
+
+/// A `Command` for background work that never shows a console window (`NoConsoleWindow`).
 pub(crate) fn background_command(program: impl AsRef<OsStr>) -> Command {
     let mut command = Command::new(program);
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        command.creation_flags(0x0800_0000);
-    }
-    #[cfg(not(windows))]
-    let _ = &mut command;
+    command.no_console_window();
     command
 }
 

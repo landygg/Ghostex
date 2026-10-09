@@ -544,10 +544,8 @@ fn run_zsh_script_blocking(
     };
     #[cfg(windows)]
     {
-        // CDXC:PlatformSupport 2026-09-14 WHY:
-        // Session polling is background work. Without CREATE_NO_WINDOW, Windows Terminal opens a new window for every PowerShell probe.
         use std::os::windows::process::CommandExt;
-        process.creation_flags(0x0800_0000 | native_flags);
+        process.creation_flags(crate::platform::process::CREATE_NO_WINDOW | native_flags);
     }
     let mut environment = build_gxserver_zmx_child_environment();
     #[cfg(windows)]

@@ -230,8 +230,9 @@ async fn claim_once(zmx_name: &str) -> std::io::Result<()> {
 #[cfg(windows)]
 async fn claim_once(zmx_name: &str) -> std::io::Result<()> {
     let zmx = crate::toolchain::require_bundled_zmx().map_err(std::io::Error::other)?;
+    use crate::platform::process::NoConsoleWindow;
     let mut child = tokio::process::Command::new(&zmx.executable_path)
-        .creation_flags(0x0800_0000)
+        .no_console_window()
         .env("WMX_DIR", crate::zmx::session_directory())
         .args(["chat-claim", zmx_name])
         .stdin(std::process::Stdio::piped())

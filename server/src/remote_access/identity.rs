@@ -1,4 +1,4 @@
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 
 use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
@@ -90,7 +90,7 @@ fn read_login_username() -> Result<String> {
 }
 
 pub(crate) fn read_first_line(program: &str, args: &[&str]) -> Option<String> {
-    let output = Command::new(program)
+    let output = crate::platform::process::background_command(program)
         .args(args)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())

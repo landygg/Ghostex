@@ -631,7 +631,7 @@ pub fn run_native_statusline_hook(args: Vec<String>) -> Result<(), DomainStateEr
             command
         }
     };
-    let mut child = command
+    let mut child = crate::platform::process::NoConsoleWindow::no_console_window(&mut command)
         .stdin(std::process::Stdio::piped())
         .spawn()
         .map_err(io_error)?;

@@ -63,7 +63,7 @@ pub(crate) fn keys_file_for_this_account() -> Result<KeysFile> {
 fn read_group_names() -> Result<Vec<String>> {
     let mut command = std::process::Command::new("whoami");
     command.args(["/groups", "/fo", "csv", "/nh"]);
-    super::ssh_enable::hide_console_window(&mut command);
+    crate::platform::process::NoConsoleWindow::no_console_window(&mut command);
     let output = command
         .output()
         .with_context(|| "read group membership with whoami")?;

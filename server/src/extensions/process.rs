@@ -591,8 +591,9 @@ pub(crate) fn configure_process_group(command: &mut Command) {
 
     #[cfg(windows)]
     {
+        use crate::platform::process::{CREATE_NEW_PROCESS_GROUP, CREATE_NO_WINDOW};
         use std::os::windows::process::CommandExt;
-        command.creation_flags(0x0000_0200 | 0x0800_0000);
+        command.creation_flags(CREATE_NEW_PROCESS_GROUP | CREATE_NO_WINDOW);
     }
 }
 

@@ -361,14 +361,13 @@ pub(crate) async fn run_zmx_title_observer(
             }
         };
         let mut command = Command::new(&zmx.executable_path);
+        crate::platform::process::NoConsoleWindow::no_console_window(&mut command);
         /*
         CDXC:SessionTitles 2026-09-28 WHY:
         wmx finds a session's endpoint under WMX_DIR, which every other wmx call gets from scripts_windows. Spawned without it, watch-title exited at once, so no native Windows session ever took its agent's terminal title (Claude sessions stayed "Claude Session") or its title-derived status.
         */
         #[cfg(windows)]
-        command
-            .creation_flags(0x0800_0000)
-            .env("WMX_DIR", crate::zmx::session_directory());
+        command.env("WMX_DIR", crate::zmx::session_directory());
         let mut child = match command
             .args(["watch-title", zmx_name.as_str()])
             .stdout(std::process::Stdio::piped())

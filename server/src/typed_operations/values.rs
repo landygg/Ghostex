@@ -4,6 +4,7 @@ use std::{
     time::Duration,
 };
 
+use crate::platform::process::NoConsoleWindow;
 use serde_json::{json, Map, Value};
 use tokio::{
     io::AsyncWriteExt,
@@ -222,9 +223,8 @@ pub(crate) async fn run_process_command(
             std::process::Stdio::null()
         })
         .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped());
-    #[cfg(windows)]
-    process.creation_flags(0x0800_0000);
+        .stderr(std::process::Stdio::piped())
+        .no_console_window();
     let mut child = process.spawn().map_err(|error| {
         // A missing working directory also reports NotFound on Unix; only an existing one means the program is.
         if error.kind() == std::io::ErrorKind::NotFound && Path::new(&command.cwd).is_dir() {

@@ -397,11 +397,7 @@ fn run_cli(
         })
         .stdout(Stdio::piped())
         .stderr(Stdio::null());
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        command.creation_flags(0x08000000);
-    }
+    crate::platform::process::NoConsoleWindow::no_console_window(&mut command);
     let mut child = command.spawn().ok()?;
     // Pi's RPC mode answers while its stdin stays open, and exits when it closes.
     let mut stdin = child.stdin.take();

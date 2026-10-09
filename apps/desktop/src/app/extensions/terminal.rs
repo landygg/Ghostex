@@ -1,4 +1,6 @@
-use std::process::{Command, Stdio};
+#[cfg(not(target_os = "windows"))]
+use std::process::Command;
+use std::process::Stdio;
 use std::time::Duration;
 
 use crate::*;
@@ -283,8 +285,6 @@ fn terminal_extension_binary_available(binary: &str) -> Result<bool, String> {
 
 #[cfg(target_os = "windows")]
 fn terminal_extension_binary_available(binary: &str) -> Result<bool, String> {
-    use std::os::windows::process::CommandExt;
-
     let (program, args) = crate::windows_terminal_backend::terminal_invocation(
         Some(format!(
             "command -v {} >/dev/null 2>&1",
@@ -292,8 +292,7 @@ fn terminal_extension_binary_available(binary: &str) -> Result<bool, String> {
         )),
         None,
     );
-    Command::new(program)
-        .creation_flags(0x0800_0000)
+    crate::app::helpers::gpui_background_command(program)
         .args(args)
         .stdin(Stdio::null())
         .stdout(Stdio::null())

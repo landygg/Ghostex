@@ -81,8 +81,7 @@ impl BackgroundSession {
             .stdout(Stdio::piped())
             .stderr(Stdio::null())
             .kill_on_drop(true);
-        #[cfg(windows)]
-        command.creation_flags(0x0800_0000);
+        crate::platform::process::NoConsoleWindow::no_console_window(&mut command);
         let output = tokio::time::timeout(Duration::from_secs(8), command.output())
             .await
             .map_err(|_| {

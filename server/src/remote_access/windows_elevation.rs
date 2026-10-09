@@ -53,7 +53,7 @@ pub(crate) fn run_elevated_powershell(
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
-    super::ssh_enable::hide_console_window(&mut command);
+    crate::platform::process::NoConsoleWindow::no_console_window(&mut command);
     let output = command
         .output()
         .map_err(|error| format!("Could not open the administrator prompt: {error}."))?;

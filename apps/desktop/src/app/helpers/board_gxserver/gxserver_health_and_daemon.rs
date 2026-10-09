@@ -853,10 +853,9 @@ pub(crate) fn gpui_spawn_local_gxserver_daemon(binary: &Path) -> Result<Vec<Stri
 /// SEE-ALSO: `spawn_server` in server/src/platform/process.rs, gxserver's own relaunch, must use the same flags.
 #[cfg(target_os = "windows")]
 pub(crate) fn gpui_spawn_local_gxserver_daemon(binary: &Path) -> Result<Vec<String>, String> {
+    use crate::app::helpers::{CREATE_NEW_PROCESS_GROUP, CREATE_NO_WINDOW};
     use std::os::windows::process::CommandExt;
 
-    const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
-    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
     let launch_log = gpui_gxserver_launch_log_path();
     if let Some(parent) = launch_log.parent() {
         std::fs::create_dir_all(parent).map_err(|_| "gxserver failed to launch.".to_string())?;

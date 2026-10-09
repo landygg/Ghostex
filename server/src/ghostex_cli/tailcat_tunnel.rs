@@ -3,7 +3,7 @@ use std::{
     io::{Read, Write},
     net::{Shutdown, TcpListener, TcpStream},
     path::{Path, PathBuf},
-    process::{Command, Stdio},
+    process::Stdio,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc, Mutex,
@@ -193,7 +193,7 @@ fn serve_connection(
     if stream.set_nonblocking(false).is_err() {
         return;
     }
-    let child = Command::new(&connection.binary_path)
+    let child = crate::platform::process::background_command(&connection.binary_path)
         .arg(&connection.address_blob)
         .arg(connection.remote_port.to_string())
         .stdin(Stdio::piped())

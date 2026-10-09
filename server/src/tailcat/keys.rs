@@ -1,7 +1,7 @@
 use std::{
     fs,
     path::{Path, PathBuf},
-    process::{Command, Stdio},
+    process::Stdio,
 };
 
 use anyhow::{bail, Context, Result};
@@ -32,7 +32,7 @@ pub fn ensure_tailcat_key_file(binary_path: &Path, key_file: &Path) -> Result<()
             .with_context(|| "create the tailcat state directory".to_string())?;
         set_dir_mode_0700(parent)?;
     }
-    let output = Command::new(binary_path)
+    let output = crate::platform::process::background_command(binary_path)
         .arg("genkey")
         .arg(format!("--key={}", key_file.display()))
         .arg("--fixed-region")
