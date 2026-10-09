@@ -598,6 +598,12 @@ const WINDOW_GLASS_MENU_LIFT_DARK: f32 = 0.08;
 
 /// CDXC:Theming 2026-09-25 DECISION:
 /// User: a single frosted menu was "not looking glassy at all", then "for the context menus and menus, we need them to be more transparent by default. Right now, the settings you have, they don't look transparent still." Every frosted menu and tooltip window uses one recipe: a 20px blur that keeps the backdrop's colour saturation (`FROSTED_MENU_BLUR_RADIUS`, `FROSTED_MENU_KEEP_SATURATION`, applied by `apply_frosted_menu_blur`; the main window's glass keeps its 60px, desaturated blur), and a fill of the theme's menu colour lifted a little toward white in dark mode covering 32% in dark mode and 60% in light mode (`frosted_menu_alpha`), so shapes and colours behind a menu read through it. Supersedes the same day's 50% fill over the main window's blur.
+///
+/// CDXC:Theming 2026-10-10 DECISION:
+/// User, on Windows, of the sidebar's ☰ menu next to the Notifications panel: "this menu is gray right now and this one is bluish please make them all consistent with the bluish one so all menus are same". On Windows every frosted menu, dropdown, context menu and tooltip takes the Notifications panel's surface: the theme colour, not lifted toward white, covering `frosted_modal_alpha` of the blur (`frosted_lift`, `frosted_menu_alpha`). Supersedes the thinner menu fill above on Windows; macOS keeps it.
+///
+/// CDXC:Theming 2026-10-10 WHY:
+/// A blurred window on Windows 11 is backed by the system acrylic (`DWMSBT_TRANSIENTWINDOW`, chosen for slide performance), which adds its own grey luminosity layer; a 32% fill lifted toward white let that grey win, while the panels' 86% fill kept the theme's tint.
 pub(crate) fn frosted_menu_fill(color: Hsla) -> Hsla {
     frosted_lift(color).opacity(frosted_menu_alpha())
 }
@@ -607,7 +613,9 @@ pub(crate) fn frosted_menu_fill(color: Hsla) -> Hsla {
 /// CDXC:Theming 2026-10-01 DECISION:
 /// User, on Linux (Hyprland): "the ask ghostex dropdown is way too transparent", "the dropdown that has Ask Ghostex and Tips & Tricks needs to be same bg look as the one that's top of the sidebar" and "all dropdowns etc need to have better bgs please in the linux app ... on macos and windows they're perfect". On Linux every menu, dropdown and tooltip in a window of its own takes the sidebar menus' fill exactly (`titlebar_popup_menu_background`, opaque and not lifted toward white), because Linux draws the sidebar's menus inside the main window with that fill (`frosted_hosting_active`). macOS and Windows keep the lifted frost.
 fn frosted_lift(color: Hsla) -> Hsla {
-    if cfg!(target_os = "linux") || CHROME_LIGHT_APPEARANCE.load(Ordering::Relaxed) {
+    if cfg!(any(target_os = "linux", target_os = "windows"))
+        || CHROME_LIGHT_APPEARANCE.load(Ordering::Relaxed)
+    {
         color
     } else {
         color.blend(gpui::white().opacity(WINDOW_GLASS_MENU_LIFT_DARK))
@@ -652,10 +660,13 @@ pub(crate) fn frosted_tooltip_fill(menu: Hsla) -> Hsla {
 
 /// How much of a frosted menu or tooltip its fill covers: little in dark mode, where the menu's
 /// light text reads over anything behind it, more in light mode, where dark text needs a lighter
-/// backing. Opaque on Linux, like the dialogs (`frosted_modal_alpha`).
+/// backing. Opaque on Linux, like the dialogs (`frosted_modal_alpha`), and the dialogs' coverage on
+/// Windows.
 pub(crate) fn frosted_menu_alpha() -> f32 {
     if cfg!(target_os = "linux") {
         FROSTED_ALPHA_LINUX
+    } else if cfg!(target_os = "windows") {
+        frosted_modal_alpha()
     } else if CHROME_LIGHT_APPEARANCE.load(Ordering::Relaxed) {
         WINDOW_GLASS_MENU_ALPHA_LIGHT
     } else {
