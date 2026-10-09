@@ -141,6 +141,16 @@ pub fn run_notify_hook(args: Vec<String>) -> Result<Option<String>, DomainStateE
         return Ok(None);
     }
     /*
+    CDXC:SessionChat 2026-10-10 WHY:
+    Claude Code runs side queries (the prompt suggestion that predicts the user's next message, compaction, memory extraction) as forked queries inside the session's own process. A fork gets a fresh agent_id but no agent_type, writes no transcript, and still fires PreToolUse under the session's id. Observed 2026-10-10 in the Main Coordinator (fa846d8e): the suggestion fork called AskUserQuestion ("Suggestion mode is asking me to predict your next message; I'll stay silent rather than guess. Anything you want next?"), Claude denied the call so it never reached the terminal or the transcript, but its PreToolUse stored a question card, and the user's answer went to the agent as a real message. The main thread's hooks carry no agent_id, and a real subagent's always carry its agent_type (its foreground questions and approvals do wait in this terminal), so an agent_id without an agent_type is a fork, and none of its events belong to the session.
+    */
+    if matches!(agent_key.as_str(), "claude" | "openclaude")
+        && first_string([payload.get("agent_id")]).is_some()
+        && first_string([payload.get("agent_type")]).is_none()
+    {
+        return Ok(None);
+    }
+    /*
     CDXC:SessionIdentity 2026-09-27 WHY:
     Hermes runs a delegate_task subagent inside the terminal's own process, and its terminal tool can start another `hermes` run; both fire this terminal's hooks under their own session id, without the parent's. Each one rebound the Ghostex session to the child: chat showed the child's transcript, the row took the child's title ("Subagent: …"), and the child's end marked the session idle mid-turn (observed 2026-09-27 in the Dobby bot, sessions G26an and G30nd). Hermes marks every process it starts for a subagent with `HERMES_DELEGATED_CHILD_CONTEXT` and starts terminal-tool commands in a new session with no controlling terminal, so neither is the session's agent. A nested run is dropped; a subagent keeps only its approval prompt, which waits in this terminal, and never names the conversation.
     */
