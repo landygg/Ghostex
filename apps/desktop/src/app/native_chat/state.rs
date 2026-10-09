@@ -110,6 +110,10 @@ pub(crate) struct NativeChatView {
     /// re-creations so a chat that is going to show one never paints a frame without it.
     pub(super) status_line_reserved: bool,
     pub(crate) bounds: std::rc::Rc<std::cell::Cell<gpui::Bounds<gpui::Pixels>>>,
+    /// The transcript rows' text width on the last frame no panel was sliding, and the width they
+    /// keep this frame while one slides (`render.rs` `hold_text_width_while_sliding`).
+    pub(super) settled_text_width: Option<f32>,
+    pub(super) held_text_width: Option<f32>,
     /// The transcript scrollbar's measured track: from the top of the transcript region to the
     /// bottom of the pane, so the composer's height never shortens it (scrollbar.rs).
     pub(super) scrollbar_track: std::rc::Rc<std::cell::Cell<gpui::Pixels>>,
@@ -359,6 +363,8 @@ impl NativeChatView {
             composer_animation: Default::default(),
             context_status_measurements: None,
             bounds: Default::default(),
+            settled_text_width: None,
+            held_text_width: None,
             scrollbar_track: Default::default(),
             transcript_scrolled_at: None,
             scroll_bottom_drawn: Default::default(),

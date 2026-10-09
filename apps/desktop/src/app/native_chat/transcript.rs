@@ -183,6 +183,10 @@ impl NativeChatView {
                     .when_some(p.transcript_width, |this, width| {
                         this.max_w(relative(1.0)).w(relative(width))
                     })
+                    // While a panel slides the row keeps its text width (render.rs).
+                    .when_some(self.held_text_width, |this, width| {
+                        this.flex_shrink_0().w(px(width)).max_w(px(width))
+                    })
                     // Transcript search tints the rows that matched; the selected one is stronger.
                     .when_some(
                         self.search_row_tint(index, &p).filter(|_| main),

@@ -9,6 +9,32 @@ use gpui::{
 use serde_json::json;
 
 impl NativeChatView {
+    /// Decides this frame's `held_text_width`: while a window panel slides
+    /// (`terminal_element::grid_resize_held`) and the pane's width would change the transcript's
+    /// text width, the rows keep the width they had before the slide, centred; the settling frame
+    /// gives them the new one.
+    ///
+    /// CDXC:SessionChat 2026-10-10 WHY: a slide that squeezed or freed the chat (the side panel
+    /// opening beside it) re-wrapped and re-measured every visible message on every frame; a long
+    /// thread on a 4K 240 Hz screen drew it at ~30 ms a frame. A pane that only re-centres a
+    /// capped transcript keeps sliding live, so nothing holds then. Terminals hold their grid the
+    /// same way.
+    fn hold_text_width_while_sliding(&mut self, p: &ChatAppearance) {
+        let pane = self.bounds.get().size.width.as_f32();
+        let natural = match p.transcript_width {
+            Some(ratio) => pane * ratio,
+            None => pane.min(768.0 * p.scale),
+        };
+        if crate::terminal_element::grid_resize_held() {
+            self.held_text_width = self
+                .settled_text_width
+                .filter(|settled| (settled - natural).abs() > 0.5);
+        } else {
+            self.settled_text_width = (pane > 0.0).then_some(natural);
+            self.held_text_width = None;
+        }
+    }
+
     /*
     CDXC:SessionChat 2026-09-20 WHY:
     The desktop shell lets this pane's transcript pass under the floating workarea header, and that
@@ -79,6 +105,7 @@ impl Render for NativeChatView {
             crate::app::helpers::window_glass_active_for(self.main_window),
         );
         let s = p.scale;
+        self.hold_text_width_while_sliding(&p);
         self.sync_search_scroll();
         // A card above the composer that is opening or closing needs the next frame; the
         // transcript's rows ask for theirs as they are drawn.
