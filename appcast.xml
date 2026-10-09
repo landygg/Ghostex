@@ -8,6 +8,50 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
         <link>https://github.com/maddada/Ghostex/releases</link>
         <description>Sparkle appcast for Ghostex macOS releases.</description>
         <item>
+            <title>10.17.0</title>
+            <pubDate>Fri, 09 Oct 2026 13:44:47 +0000</pubDate>
+            <sparkle:fullReleaseNotesLink>https://github.com/maddada/Ghostex/releases/tag/v10.17.0</sparkle:fullReleaseNotesLink>
+            <sparkle:version>101700</sparkle:version>
+            <sparkle:shortVersionString>10.17.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <description sparkle:format="markdown"><![CDATA[# Ghostex 10.17.0
+
+## 10.17.0 - 2026-10-09
+
+**Ghostex 10.17.0 is out.** Workspaces and Work Mode arrive as an extension you can turn on, a chat's history no longer disappears after Escape, dialogs keep their focus on Windows, and the Files editor gets find, Open with and proper Windows editing keys.
+
+### 🧩 Workspaces and Work Mode
+- **Workspaces and Work Mode are a built-in extension, off by default:** turn it on in Settings > Extensions to get workspaces with their own browser sign-ins, a Work page with Linear and GitHub items, Link to and Create Linear ticket on sessions, and your team's Slack flow.
+
+### 💬 Chat
+- **A chat no longer loses its earlier history** after you press Escape and send again.
+- **Long messages show their first lines with Show more,** and scrolling past a very long message no longer lags the app.
+- **Send failures say what actually went wrong** (the message never appeared, appeared twice, or was kept by the agent), and Claude sessions on a saved account are no longer reported as stopped.
+- **Short hex colors like `#abc` show a swatch,** while all-digit numbers like `#1234` stay issue links.
+- **The loading notice stays on one line** when there's room.
+
+### 📂 Files
+- **Ctrl+F (Cmd+F) finds in the open file,** with next and previous match.
+- **Open with works on Windows,** listing your apps and browsers plus Choose another app.
+- **Windows editing keys work in the Markdown editor:** Ctrl+arrows by word, Shift+Home/End, Ctrl+Home/End and Ctrl+Backspace.
+- **File list tooltips sit below the pointer and wrap,** and hovering one no longer closes the floating list.
+
+### 🪟 Windows and dialogs
+- **Dialogs keep their focus:** Rename keeps its selected text and History stays open instead of the main window taking focus back; clicking away closes Rename without renaming.
+- **The floating chat stays open** with two windows, and a second window no longer hides the first window's menu.
+- **Tooltips never block clicks,** and a pane's blue attention line shows along its top edge.
+- **The terminal view's Switch Account opens its account list,** to the right when there's room.
+
+### 🗂️ Sessions
+- **Starting a new session no longer closes your other empty sessions;** turn it back on for Chat agents with Settings > General > Chat > Close empty sessions when starting a new one.
+
+### 📱 Phone
+- **The phone's session menu matches the desktop's Copy, Work Mode and Parked menus,** and its chat connection recovers from a dropped link instead of showing raw errors.
+]]></description>
+            <enclosure url="https://github.com/maddada/Ghostex/releases/download/v10.17.0/ghostex-10.17.0-arm64.dmg" length="119679264" type="application/octet-stream" sparkle:edSignature="+b37va2r4+BPQhA8Ss8XV2yMAs4G8bzZ2N9381p0uftXMUSUhYhcOSwYATw2kDksXP2ZBYj8OOnrLNaBrZgyBA=="/>
+        </item>
+        <item>
             <title>10.16.0</title>
             <pubDate>Fri, 09 Oct 2026 01:15:42 +0000</pubDate>
             <sparkle:fullReleaseNotesLink>https://github.com/maddada/Ghostex/releases/tag/v10.16.0</sparkle:fullReleaseNotesLink>
@@ -259,57 +303,6 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
             <enclosure url="https://github.com/maddada/Ghostex/releases/download/v10.13.0/ghostex-10.13.0-arm64.dmg" length="112092928" type="application/octet-stream" sparkle:edSignature="vMcNA8FwXuHUnDoPAA90IGF884BNH9DiDKKzsoC2r7r3Ml1TGqM9lDYFrX06cZR3h8Y6zhzil1uwyPEIjIlMCw=="/>
         </item>
         <item>
-            <title>10.12.0</title>
-            <pubDate>Mon, 05 Oct 2026 00:03:55 +0000</pubDate>
-            <sparkle:fullReleaseNotesLink>https://github.com/maddada/Ghostex/releases/tag/v10.12.0</sparkle:fullReleaseNotesLink>
-            <sparkle:version>101200</sparkle:version>
-            <sparkle:shortVersionString>10.12.0</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
-            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <description sparkle:format="markdown"><![CDATA[# Ghostex 10.12.0
-
-## 10.12.0 - 2026-10-05
-
-**Ghostex 10.12.0 is out.** Make any session a coordinator without interrupting it, run coordinators on ZCode, switch Claude accounts on Windows, copy whole tool calls from the chat, and a new session tidies away the project's empty ones.
-
-### 🧭 Coordinators
-- **Make Coordinator turns an existing session into a coordinator without interrupting it.** Right-click a Claude, Codex or ZCode session, open Advanced and choose Make Coordinator, or use the session's menu on the phone. It keeps its conversation, gets the crown right away, and picks up the coordinator playbook once its current turn ends. From a terminal: `ghostex coordinator promote <session>`.
-- **Coordinators can run on ZCode, with a model picker** in New Coordinator…, thanks to @Ni7e.
-- **Messages between agents name the sender after the message,** so a new thread titles itself from its task instead of from the agent that sent it.
-
-### 👥 Accounts
-- **Windows: Ghostex confirms a Claude account switch by checking which account the restarted agent really uses.** Switching on Windows also needs a Claude Swap version with Windows history sharing, which is on its way upstream.
-- **Switching the account of a session you never sent a message to works,** instead of failing with "No conversation found".
-- **A failed account switch card has a close (X) button** that dismisses it on the computer and the phone.
-- **Add account in Settings > Accounts always opens the sign-in form,** and long email addresses in menus are shortened instead of stretching the menu.
-- **Account chips fill their row in the sidebar.**
-
-### 💬 Chat
-- **Tool calls in the chat are selectable and have a copy-all button** that copies the tool's name, input and result, on the computer, the web and the phone.
-- **The spinning working icon no longer shows flickering square lines.**
-
-### ⌨️ Terminal
-- **Shift+Insert pastes** in terminals and in text fields such as the chat composer and dialogs, thanks to @rgruenewald.
-- **Windows: Shift+Enter inserts a newline in Claude Code.**
-- **Windows: no more leftover characters at the left edge of a terminal,** for example after Claude's /usage.
-
-### 🗂️ Sessions and sidebar
-- **Starting a new session closes the project's older sessions that are still completely empty:** nothing sent, no chat draft, nothing queued and no text in the agent's input box. This applies to the hotkey, the project's agent button and menu, the New Thread picker and the phone.
-- **Windows: a session can no longer take on another session's identity** when Windows reuses a process ID or an agent runs `claude -p` inside it, and a title taken from the wrong conversation corrects itself.
-- **Search and Notifications stay in the sidebar's top row;** only Feedback moves into the sidebar menu when the sidebar is narrow.
-- **Windows: the sidebar's minimum width is 200 px (300 px on a 150% screen),** so its top row always fits.
-
-### 📱 On the phone
-- **SVG project icons show on the phone,** such as a project's favicon.svg.
-- **Image chips in the phone's composer no longer leave a stray line after them.**
-- **Windows: Easy Connect pairing with the phone works,** because the pairing code now names the port the Ghostex server really listens on.
-
-### 🩹 Fixes and polish
-- **Model pickers show this release's model lineup right after an update** instead of the previous release's, thanks to @Ni7e.
-]]></description>
-            <enclosure url="https://github.com/maddada/Ghostex/releases/download/v10.12.0/ghostex-10.12.0-arm64.dmg" length="112124003" type="application/octet-stream" sparkle:edSignature="DCaXDfaVNtv2ETX6I1Da9cQ6qVG8/dxWjrlaQXfVLS+AaraTvaVVuV1xAbIdPoxInG95EKyMs91W6C/h59tfCQ=="/>
-        </item>
-        <item>
             <title>3.26.1</title>
             <pubDate>Mon, 01 Jun 2026 18:43:20 +0400</pubDate>
             <sparkle:fullReleaseNotesLink>https://github.com/maddada/Ghostex/releases/tag/v3.26.1</sparkle:fullReleaseNotesLink>
@@ -321,6 +314,6 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
     </channel>
 </rss>
 <!-- sparkle-signatures:
-edSignature: +R4+89v//Sza85/JBITEl1SU5WD8gSgInorwxdJ6/BJybTevcojSdgvbzNqdfhj7UGdepLtn4yxMcsfNCFMnAA==
-length: 25645
+edSignature: 9BpxPu2DgR85EmQbkGcXzVlYhsDlLH3s7brIDOmVi6iBt2cn4n4XqNVlhvDncaj0gF04zKYyQJHWqK0cLPi5BQ==
+length: 24732
 -->
