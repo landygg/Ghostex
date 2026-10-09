@@ -63,6 +63,8 @@ fn send_write_failure(
         SendWriteFailure::PasteDoubled
     } else if crate::session_chat_send_submit::is_not_submitted_failure(&error.message) {
         SendWriteFailure::NotSubmitted
+    } else if error.message == crate::session_chat_send::SESSION_CHAT_BUSY_AGENT_STALLED {
+        SendWriteFailure::AgentStalled
     } else {
         SendWriteFailure::TerminalUnresponsive
     }
@@ -552,6 +554,11 @@ pub(crate) async fn send_session_chat_message_with_draft(
         0,
         crate::session_chat_send::SessionChatSendStep::StopLocalCommandOutput,
     );
+    let mid_turn_probe = super::agent_mid_turn_probe(state, &target, terminal_agent.as_deref());
+    steps.insert(
+        0,
+        crate::session_chat_send::SessionChatSendStep::WaitOutBusyAgent(mid_turn_probe.clone()),
+    );
     crate::session_chat_returned_prompt::record_session_chat_send_started(
         &target.project_id,
         &target.session_id,
@@ -571,7 +578,13 @@ pub(crate) async fn send_session_chat_message_with_draft(
     .await;
     if let (Err(error), Some(retry_steps)) = (&sent, retry_steps) {
         if paste_not_accepted(error) {
-            if let Some(late_steps) = late_paste_steps(&retry_steps) {
+            if let Some(mut late_steps) = late_paste_steps(&retry_steps) {
+                late_steps.insert(
+                    0,
+                    crate::session_chat_send::SessionChatSendStep::WaitOutBusyAgent(
+                        mid_turn_probe.clone(),
+                    ),
+                );
                 sent = crate::session_chat_send::execute_session_chat_send(
                     &target.project_id,
                     &target.session_id,
@@ -634,6 +647,7 @@ pub(crate) async fn send_session_chat_message_with_draft(
                 text,
                 heal_steps,
                 send_started_ms,
+                error.message == crate::session_chat_send::SESSION_CHAT_BUSY_AGENT_STALLED,
                 crate::session_chat_send_submit::is_not_submitted_failure(&error.message),
             )
             .await

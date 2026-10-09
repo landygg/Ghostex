@@ -85,6 +85,7 @@ use serde_json::{json, Map};
 
 mod box_first_send;
 mod endpoints;
+mod mid_turn;
 mod post_send;
 mod scheduler;
 mod send;
@@ -92,6 +93,7 @@ mod send_heal;
 mod wiring;
 
 pub(crate) use endpoints::*;
+pub(crate) use mid_turn::*;
 pub(crate) use post_send::*;
 pub use scheduler::*;
 pub(crate) use send::*;

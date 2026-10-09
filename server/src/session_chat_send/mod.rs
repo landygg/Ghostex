@@ -59,6 +59,7 @@ pub(crate) use composer_repaint::claude_composer_needs_redraw;
 
 mod answer_http;
 mod ask_answer_keys;
+mod busy_input_wait;
 mod constants;
 mod draft_capture;
 mod handoff_http;
@@ -74,6 +75,7 @@ mod worker;
 
 pub(crate) use answer_http::*;
 pub use ask_answer_keys::*;
+pub use busy_input_wait::*;
 pub use constants::*;
 pub use draft_capture::*;
 pub(crate) use handoff_http::*;

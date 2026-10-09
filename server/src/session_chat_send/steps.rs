@@ -163,6 +163,9 @@ pub enum SessionChatSendStep {
         agent: String,
         text: String,
     },
+    /// Lets this job's verified clear, paste check and submit check keep waiting while the agent
+    /// is in the middle of a turn (session_chat_send/busy_input_wait.rs). Writes nothing.
+    WaitOutBusyAgent(AgentMidTurnProbe),
     /*
     CDXC:SessionChat 2026-09-02:
     Hand the input line to the agent rewind driver for its whole terminal

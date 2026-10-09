@@ -237,6 +237,8 @@ pub enum SendWriteFailure {
     PasteDoubled,
     /// The agent kept the message in its input box after Enter.
     NotSubmitted,
+    /// The agent stayed mid-turn without taking new input for as long as the send waits.
+    AgentStalled,
 }
 
 impl SendWriteFailure {
@@ -246,6 +248,7 @@ impl SendWriteFailure {
             Self::PasteNotShown => "The message was typed into the terminal but never appeared in the agent's input box, so it was not sent. Open the terminal to see what it is showing, then send it again.",
             Self::PasteDoubled => "The message showed up twice in the agent's input box, so Ghostex cleared it instead of sending it. Send it again.",
             Self::NotSubmitted => "The agent kept the message in its input box after Enter instead of sending it, so it was not sent. Open the terminal to see what it is showing.",
+            Self::AgentStalled => "The agent stayed in the middle of a turn for five minutes without taking new input, so the message was not sent. Open the terminal to see what it is showing.",
         }
     }
 }

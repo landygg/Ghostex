@@ -38,6 +38,7 @@ pub(super) async fn heal_refused_send(
     text: &str,
     retry_steps: Vec<crate::session_chat_send::SessionChatSendStep>,
     send_started_ms: i64,
+    agent_stalled: bool,
     kept_in_box: bool,
 ) -> SendHeal {
     if paste_already_recorded(&target.session, text, send_started_ms).await {
@@ -76,7 +77,10 @@ pub(super) async fn heal_refused_send(
         &crate::resume_lookup::home_dir(),
     )
     .await;
+    // A turn that sat on the send's input for five minutes (session_chat_send/busy_input_wait.rs)
+    // would take a Ctrl+L and a second copy just as late as the first.
     if running
+        && !agent_stalled
         && crate::agents::identity::normalize_agent_id(terminal_agent).as_deref() == Some("claude")
         && repaint_claude(target, terminal_agent).await
     {

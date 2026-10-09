@@ -4,7 +4,8 @@ use std::time::{Duration, Instant};
 
 use crate::session_chat_send::{
     build_agent_tui_clear_input_for_text, capture_session_terminal_text_vt,
-    normalize_session_chat_screen_text, session_chat_paste_needles, write_session_chat_payload,
+    normalize_session_chat_screen_text, record_busy_agent_wait, session_chat_paste_needles,
+    wait_out_busy_agent, write_session_chat_payload, AgentMidTurnProbe, BusyAgentWait,
     SessionChatSendError, SessionChatSendFailure, SESSION_CHAT_EMPRYO_SUBMIT,
 };
 
@@ -44,6 +45,7 @@ pub(crate) async fn confirm_submitted(
     text: &str,
     submit: &str,
     cancelled: &(dyn Fn() -> bool + Send + Sync),
+    mid_turn: Option<&AgentMidTurnProbe>,
 ) -> Result<(), SessionChatSendError> {
     let needles = session_chat_paste_needles(text);
     if needles.is_empty() {
@@ -69,6 +71,23 @@ pub(crate) async fn confirm_submitted(
     let Some(screen) = message_still_held(agent, zmx_name, &needles, cancelled).await else {
         return Ok(());
     };
+    // A mid-turn agent takes the Return when its screen catches up; clearing the box now would
+    // throw away a message it is about to queue (busy_input_wait.rs).
+    if let Some(probe) = mid_turn {
+        let needles = needles.as_slice();
+        match wait_out_busy_agent(probe, cancelled, move || async move {
+            !message_held_now(agent, zmx_name, needles).await
+        })
+        .await
+        {
+            BusyAgentWait::Settled => {
+                record_busy_agent_wait(project_id, session_id, "it took the Return");
+                return Ok(());
+            }
+            BusyAgentWait::Cancelled => return Ok(()),
+            BusyAgentWait::NotMidTurn | BusyAgentWait::TurnEnded | BusyAgentWait::Stalled => {}
+        }
+    }
     let kept = if matches!(agent, "codex" | "empryo") {
         format!(
             "{} kept the message in its input box instead of sending it. Press {} in the terminal to send it.",
@@ -132,19 +151,30 @@ async fn message_still_held(
             return None;
         }
         let screen = capture_session_terminal_text_vt(zmx_name).await?;
-        let input = crate::session_chat_composer::session_chat_composer_input(agent, &screen)?;
-        let held = !input.is_empty() && {
-            let typed = normalize_session_chat_screen_text(&input.text);
-            needles.iter().any(|needle| typed.contains(needle.as_str()))
-                || (agent != "codex" && typed.to_lowercase().contains(CLAUDE_PASTED_PLACEHOLDER))
-        };
-        if !held {
+        if !input_holds_message(agent, &screen, needles) {
             return None;
         }
         if started.elapsed() >= SUBMIT_CHECK_WINDOW {
             return Some(screen);
         }
     }
+}
+
+/// One capture of `message_still_held`'s question; an unreadable screen counts as taken.
+async fn message_held_now(agent: &str, zmx_name: &str, needles: &[String]) -> bool {
+    capture_session_terminal_text_vt(zmx_name)
+        .await
+        .is_some_and(|screen| input_holds_message(agent, &screen, needles))
+}
+
+fn input_holds_message(agent: &str, screen: &str, needles: &[String]) -> bool {
+    crate::session_chat_composer::session_chat_composer_input(agent, screen).is_some_and(|input| {
+        !input.is_empty() && {
+            let typed = normalize_session_chat_screen_text(&input.text);
+            needles.iter().any(|needle| typed.contains(needle.as_str()))
+                || (agent != "codex" && typed.to_lowercase().contains(CLAUDE_PASTED_PLACEHOLDER))
+        }
+    })
 }
 
 fn screen_tail(screen: &str) -> Vec<String> {

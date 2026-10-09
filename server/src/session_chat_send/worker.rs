@@ -27,6 +27,7 @@ pub(super) async fn run_session_chat_send_worker(
         let mut outcome = Ok(());
         let mut composer_agent: Option<String> = None;
         let mut clear_pending = false;
+        let mut mid_turn_probe: Option<AgentMidTurnProbe> = None;
         for step in steps {
             if job_generation != generation.load(Ordering::SeqCst) {
                 outcome = Err(SessionChatSendError::not_attempted(
@@ -313,18 +314,46 @@ pub(super) async fn run_session_chat_send_worker(
                     }
                 }
                 SessionChatSendStep::ClearComposer { agent } => {
+                    let cancelled = || job_generation != generation.load(Ordering::SeqCst);
                     if let Err(error) = clear_session_chat_composer(
                         &project_id,
                         &session_id,
                         &zmx_name,
                         &source,
                         &agent,
-                        &|| job_generation != generation.load(Ordering::SeqCst),
+                        &cancelled,
                     )
                     .await
                     {
-                        outcome = Err(error);
-                        break;
+                        // The clear's one key may still be on its way to a mid-turn agent; another
+                        // would land on the box it empties (busy_input_wait.rs).
+                        let wait = match (&error.failure, &mid_turn_probe) {
+                            (SessionChatSendFailure::ComposerNotCleared, Some(probe)) => {
+                                let (zmx, agent): (&str, &str) = (&zmx_name, &agent);
+                                wait_out_busy_agent(probe, &cancelled, move || {
+                                    composer_reads_empty(zmx, agent)
+                                })
+                                .await
+                            }
+                            _ => BusyAgentWait::NotMidTurn,
+                        };
+                        match wait {
+                            BusyAgentWait::Settled => record_busy_agent_wait(
+                                &project_id,
+                                &session_id,
+                                "its input box cleared",
+                            ),
+                            BusyAgentWait::Stalled => {
+                                outcome = Err(busy_agent_stalled());
+                                break;
+                            }
+                            BusyAgentWait::NotMidTurn
+                            | BusyAgentWait::TurnEnded
+                            | BusyAgentWait::Cancelled => {
+                                outcome = Err(error);
+                                break;
+                            }
+                        }
                     }
                 }
                 SessionChatSendStep::GuardClaudeInterrupt => {
@@ -650,6 +679,7 @@ pub(super) async fn run_session_chat_send_worker(
                         &text,
                         &submit,
                         &|| job_generation != generation.load(Ordering::SeqCst),
+                        mid_turn_probe.as_ref(),
                     )
                     .await
                     {
@@ -846,7 +876,7 @@ pub(super) async fn run_session_chat_send_worker(
                     settle_ms,
                     timeout_ms,
                 } => {
-                    let verification = verify_session_chat_paste_landed(
+                    let mut verification = verify_session_chat_paste_landed(
                         &zmx_name,
                         composer_agent.as_deref(),
                         &text,
@@ -856,6 +886,50 @@ pub(super) async fn run_session_chat_send_worker(
                         job_generation,
                     )
                     .await;
+                    // A mid-turn agent's paste is late, not lost: typing it again would stack a
+                    // second copy behind it (busy_input_wait.rs).
+                    if let (SessionChatPasteVerification::Absent, Some(probe)) =
+                        (verification, &mid_turn_probe)
+                    {
+                        let (zmx, agent, body, current): (&str, Option<&str>, &str, &AtomicU64) =
+                            (&zmx_name, composer_agent.as_deref(), &text, &generation);
+                        let shown = wait_out_busy_agent(
+                            probe,
+                            &|| job_generation != current.load(Ordering::SeqCst),
+                            move || async move {
+                                verify_session_chat_paste_landed(
+                                    zmx,
+                                    agent,
+                                    body,
+                                    0,
+                                    0,
+                                    current,
+                                    job_generation,
+                                )
+                                .await
+                                    == SessionChatPasteVerification::Landed
+                            },
+                        )
+                        .await;
+                        verification = match shown {
+                            BusyAgentWait::Settled => {
+                                record_busy_agent_wait(
+                                    &project_id,
+                                    &session_id,
+                                    "its paste showed in the input box",
+                                );
+                                SessionChatPasteVerification::Landed
+                            }
+                            BusyAgentWait::Stalled => {
+                                outcome = Err(busy_agent_stalled());
+                                break;
+                            }
+                            BusyAgentWait::NotMidTurn | BusyAgentWait::TurnEnded => {
+                                SessionChatPasteVerification::Absent
+                            }
+                            BusyAgentWait::Cancelled => SessionChatPasteVerification::Cancelled,
+                        };
+                    }
                     match verification {
                         SessionChatPasteVerification::Landed => {}
                         SessionChatPasteVerification::Unreadable => {
@@ -903,6 +977,9 @@ pub(super) async fn run_session_chat_send_worker(
                             break;
                         }
                     }
+                }
+                SessionChatSendStep::WaitOutBusyAgent(probe) => {
+                    mid_turn_probe = Some(probe);
                 }
                 SessionChatSendStep::KeepSinglePaste { agent, text } => {
                     if let Err(error) = keep_single_session_chat_paste(
