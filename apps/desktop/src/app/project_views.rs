@@ -189,6 +189,9 @@ impl GhostexGpuiApp {
             .project_view_key(id)
             .and_then(|key| self.project_views.entries.get(&key));
         let status = entry.map(|e| e.status.clone()).unwrap_or(Value::Null);
+        if let Some(provider) = super::project_websites::website_provider(id) {
+            return website_placeholder(id, provider, name, text(&status, "state"));
+        }
         let show_output = entry.is_some_and(|e| e.show_output);
         let state = text(&status, "state");
         let message = if show_output {
@@ -529,6 +532,34 @@ impl GhostexGpuiApp {
             })
             .detach();
         }
+    }
+}
+/// CDXC:Extensions 2026-10-10 WHY:
+/// A project website runs no command: its URL comes from settings or the cached git origin. It used to share the command view's card, so waiting for the browser engine showed "Opening GitHub…" with Stop and Command output buttons. Draw the page skeleton while it opens, and one plain sentence when there is no URL.
+fn website_placeholder(
+    id: ExtensionId,
+    provider: &super::project_websites::WebsiteProvider,
+    name: &str,
+    state: &str,
+) -> ProjectEditorPlaceholderSignature {
+    let (title, message) = if state == "ready" {
+        (format!("Opening {name}…"), String::new())
+    } else if provider.automatic() {
+        (
+            name.to_string(),
+            format!("This project has no {name} remote."),
+        )
+    } else {
+        (
+            name.to_string(),
+            format!("Choose a {name} home for this project."),
+        )
+    };
+    ProjectEditorPlaceholderSignature {
+        mode: TitlebarMode::Extension(id),
+        title: Some(title),
+        message,
+        actions: Vec::new(),
     }
 }
 fn project_view_rpc(
