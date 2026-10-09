@@ -695,6 +695,7 @@ impl GhostexGpuiApp {
                             .then_some(document.changes.as_ref())
                             .flatten(),
                         table_actions: &table_actions,
+                        sliding: crate::terminal_element::grid_resize_held(),
                     },
                     p,
                     window,

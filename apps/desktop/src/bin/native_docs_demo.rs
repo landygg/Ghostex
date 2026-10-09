@@ -97,6 +97,7 @@ impl Render for DocsDemo {
                 source: self.source,
                 line_numbers: true,
                 constrain: false,
+                sliding: false,
                 changes: self.changes.as_ref(),
                 table_actions: &table_tools::TableActionHost {
                     copy: std::rc::Rc::new(|text, cx| {

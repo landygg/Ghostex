@@ -26,6 +26,24 @@ thread_local! {
     static LAST_SCROLL: std::cell::Cell<f32> = const { std::cell::Cell::new(f32::NAN) };
     /// The table sort the table controls last applied (one Markdown body draws at a time).
     static TABLE_SORT: super::table_tools::TableSort = std::rc::Rc::default();
+    /// The text column's width on the last frame no panel was sliding (one Markdown body draws at
+    /// a time).
+    static SETTLED_COLUMN: std::cell::Cell<f32> = const { std::cell::Cell::new(f32::NAN) };
+}
+
+/// The width the text column keeps this frame, when a panel slides and the body's width would
+/// change it.
+///
+/// CDXC:Docs 2026-10-10 WHY: the editor lays its document out again whenever its column's width changes, so a long file (AGENTS.md) beside a sliding panel, the side panel itself or the sidebar, was laid out on every frame of the slide and made it stutter. The column holds the width it had before the slide, centred, and takes the new one once on the settling frame, as the chat's rows and the terminals do.
+fn held_column_width(available: f32, natural: f32, sliding: bool) -> Option<f32> {
+    if sliding {
+        let settled = SETTLED_COLUMN.with(std::cell::Cell::get);
+        return (settled.is_finite() && (settled - natural).abs() > 0.5).then_some(settled);
+    }
+    if available > 0.0 {
+        SETTLED_COLUMN.with(|cell| cell.set(natural));
+    }
+    None
 }
 
 pub(crate) struct DocsMarkdownBody<'a> {
@@ -39,6 +57,9 @@ pub(crate) struct DocsMarkdownBody<'a> {
     pub(crate) changes: Option<&'a (Vec<LineChange>, Vec<usize>)>,
     /// What a hovered table's actions do (`table_tools::render_table_actions`).
     pub(crate) table_actions: &'a super::table_tools::TableActionHost,
+    /// Whether a window panel is sliding (the app's `terminal_element::grid_resize_held`): the
+    /// text column then keeps the width it had before the slide.
+    pub(crate) sliding: bool,
 }
 
 /// The scrolling body. The caller adds its key handling and puts the formatting bar and
@@ -129,6 +150,13 @@ pub(crate) fn render_markdown_body(
     };
     let focus_target = body.live.clone();
     let gutter_width = super::gutter::gutter_width(body.line_numbers);
+    let available = f32::from(body.scroll.bounds().size.width);
+    let natural = if body.constrain {
+        available.min(CONTENT_MAX_WIDTH + gutter_width)
+    } else {
+        available
+    };
+    let held = held_column_width(available, natural, body.sliding);
     div()
         .id(body.id)
         .flex_1()
@@ -144,6 +172,9 @@ pub(crate) fn render_markdown_body(
                     .w_full()
                     .when(body.constrain, |row| {
                         row.max_w(px(CONTENT_MAX_WIDTH + gutter_width))
+                    })
+                    .when_some(held, |row, width| {
+                        row.flex_shrink_0().w(px(width)).max_w(px(width))
                     })
                     .pt(px(BODY_TOP_PAD))
                     .pb(px(BODY_BOTTOM_PAD))
