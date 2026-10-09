@@ -4,6 +4,7 @@ import {
   IconBox,
   IconChevronDown,
   IconCircleDot,
+  IconCopy,
   IconFolder,
   IconGitPullRequest,
   IconHash,
@@ -32,7 +33,12 @@ import {
   statusMatches,
   type StatusFilter,
 } from "./format";
-import type { WorkItem, WorkList as WorkListData } from "./types";
+import type {
+  WorkItem,
+  WorkItemLink,
+  WorkList as WorkListData,
+  WorkTracker,
+} from "./types";
 
 export interface WorkFilters {
   search: string;
@@ -42,14 +48,15 @@ export interface WorkFilters {
   pullRequests: boolean;
   status: StatusFilter;
   projectId: string;
-  linearProject: string;
+  /** A Linear project's or a GitHub Project's name, whichever the workspace's tracker uses. */
+  trackerProject: string;
   inSidebar: boolean;
 }
 
 /**
  * CDXC:WorkMode 2026-10-09 DECISION:
- * User: the Work list opens with "Assigned to me" turned on; the other filters (the three kinds,
- * status open, repo, Linear project, "In my sidebar") start wide open.
+ * User: the Work list opens with "Assigned to me" turned on; the other filters (the kinds, status
+ * open, repo, project, "In my sidebar") start wide open.
  */
 export const DEFAULT_WORK_FILTERS: WorkFilters = {
   search: "",
@@ -59,13 +66,22 @@ export const DEFAULT_WORK_FILTERS: WorkFilters = {
   pullRequests: true,
   status: "open",
   projectId: "",
-  linearProject: "",
+  trackerProject: "",
   inSidebar: false,
 };
+
+/** The project an item shows: a Linear project, or a GitHub Project in a GitHub workspace. */
+export function trackerProjectOf(
+  item: WorkItem,
+  tracker: WorkTracker,
+): WorkItemLink | undefined {
+  return tracker === "github" ? item.githubProject : item.linearProject;
+}
 
 export function filterWorkItems(
   items: WorkItem[],
   filters: WorkFilters,
+  tracker: WorkTracker = "linear",
 ): WorkItem[] {
   const query = filters.search.trim().toLowerCase();
   return items.filter((item) => {
@@ -76,8 +92,8 @@ export function filterWorkItems(
     if (!statusMatches(filters.status, item.status.group)) return false;
     if (filters.projectId && item.projectId !== filters.projectId) return false;
     if (
-      filters.linearProject &&
-      item.linearProject?.name !== filters.linearProject
+      filters.trackerProject &&
+      trackerProjectOf(item, tracker)?.name !== filters.trackerProject
     )
       return false;
     if (filters.inSidebar && item.sessions.length === 0) return false;
@@ -86,7 +102,7 @@ export function filterWorkItems(
         item.id,
         item.title,
         item.projectName,
-        item.linearProject?.name,
+        trackerProjectOf(item, tracker)?.name,
         item.assignee?.name,
         item.branchName,
         item.pullRequest ? `#${item.pullRequest.number}` : "",
@@ -108,7 +124,7 @@ function activeFilterCount(filters: WorkFilters): number {
     count += 1;
   if (filters.status !== "open") count += 1;
   if (filters.projectId) count += 1;
-  if (filters.linearProject) count += 1;
+  if (filters.trackerProject) count += 1;
   if (filters.inSidebar) count += 1;
   return count;
 }
@@ -123,6 +139,7 @@ export function WorkListView({
   onOpen,
   onNewTicket,
   newTicketError,
+  onDismissNotice,
   now,
 }: {
   data: WorkListData | null;
@@ -135,23 +152,28 @@ export function WorkListView({
   /** Opens the app's native Create Linear Ticket dialog (apps/desktop/src/app/work_view/bridge.rs). */
   onNewTicket: () => void;
   newTicketError: string | null;
+  /** Closes a notice for good (gxserver remembers it). */
+  onDismissNotice: (notice: string) => void;
   now: number;
 }) {
   const items = data?.items ?? [];
+  // CDXC:WorkMode 2026-10-09 DECISION:
+  // User: the Work page lists the workspace's primary tracker's tickets (plus PRs); the other tracker's type filter is hidden, and the project filter is "All projects" for the primary's kind of project.
+  const tracker: WorkTracker = data?.tracker ?? "linear";
   const visible = useMemo(
-    () => filterWorkItems(items, filters),
-    [items, filters],
+    () => filterWorkItems(items, filters, tracker),
+    [items, filters, tracker],
   );
-  const linearProjects = useMemo(
+  const trackerProjects = useMemo(
     () =>
       [
         ...new Set(
           items
-            .map((item) => item.linearProject?.name)
+            .map((item) => trackerProjectOf(item, tracker)?.name)
             .filter((name): name is string => Boolean(name)),
         ),
       ].sort((a, b) => a.localeCompare(b)),
-    [items],
+    [items, tracker],
   );
   const projects = data?.projects ?? [];
   const set = (patch: Partial<WorkFilters>) =>
@@ -182,7 +204,11 @@ export function WorkListView({
         {projects.length > 0 ? (
           <Button
             className="work-new-ticket"
-            title="Create a Linear ticket"
+            title={
+              tracker === "github"
+                ? "Create a GitHub issue"
+                : "Create a Linear ticket"
+            }
             onClick={onNewTicket}
           >
             <IconPlus size={14} />
@@ -236,22 +262,25 @@ export function WorkListView({
           <Avatar name="Me" size={15} />
           Assigned to me
         </Toggle>
-        <Toggle
-          className="filter-linear"
-          pressed={filters.linearIssues}
-          onPressedChange={(linearIssues) => set({ linearIssues })}
-        >
-          <IconCircleDot size={13} className="c-linear" />
-          Linear issues
-        </Toggle>
-        <Toggle
-          className="filter-gh-issues"
-          pressed={filters.githubIssues}
-          onPressedChange={(githubIssues) => set({ githubIssues })}
-        >
-          <IconCircleDot size={13} className="c-open" />
-          GitHub issues
-        </Toggle>
+        {tracker === "linear" ? (
+          <Toggle
+            className="filter-linear"
+            pressed={filters.linearIssues}
+            onPressedChange={(linearIssues) => set({ linearIssues })}
+          >
+            <IconCircleDot size={13} className="c-linear" />
+            Linear issues
+          </Toggle>
+        ) : (
+          <Toggle
+            className="filter-gh-issues"
+            pressed={filters.githubIssues}
+            onPressedChange={(githubIssues) => set({ githubIssues })}
+          >
+            <IconCircleDot size={13} className="c-open" />
+            GitHub issues
+          </Toggle>
+        )}
         <Toggle
           className="filter-prs"
           pressed={filters.pullRequests}
@@ -336,19 +365,22 @@ export function WorkListView({
           )}
         </Dropdown>
         <Dropdown
-          className="filter-linear-project"
+          className="filter-tracker-project"
           trigger={(open, toggle) => (
             <button
               type="button"
               className={cx(
                 "w-toggle",
-                filters.linearProject && "is-on",
+                filters.trackerProject && "is-on",
                 open && "is-focus",
               )}
               onClick={toggle}
             >
-              <IconBox size={13} className="c-linear" />
-              {filters.linearProject || "All Linear projects"}
+              <IconBox
+                size={13}
+                className={tracker === "linear" ? "c-linear" : undefined}
+              />
+              {filters.trackerProject || "All projects"}
               <IconChevronDown size={12} />
             </button>
           )}
@@ -356,20 +388,20 @@ export function WorkListView({
           {(close) => (
             <>
               <MenuItem
-                checked={!filters.linearProject}
+                checked={!filters.trackerProject}
                 onSelect={() => {
-                  set({ linearProject: "" });
+                  set({ trackerProject: "" });
                   close();
                 }}
               >
-                All Linear projects
+                All projects
               </MenuItem>
-              {linearProjects.map((name) => (
+              {trackerProjects.map((name) => (
                 <MenuItem
                   key={name}
-                  checked={filters.linearProject === name}
+                  checked={filters.trackerProject === name}
                   onSelect={() => {
-                    set({ linearProject: name });
+                    set({ trackerProject: name });
                     close();
                   }}
                 >
@@ -390,6 +422,7 @@ export function WorkListView({
       </div>
 
       <Notices data={data} error={error} />
+      <GithubProjectsNotice data={data} onDismiss={onDismissNotice} />
 
       <div className="w-list-meta">
         <span>
@@ -452,7 +485,7 @@ function Notices({
 }) {
   const notices: string[] = [];
   if (error) notices.push(error);
-  if (data && !data.linearConfigured) {
+  if (data && !data.linearConfigured && data.tracker !== "github") {
     notices.push(
       'Add a Linear API key to see Linear tickets: run "ghostex work-mode linear-key" or set it in Settings.',
     );
@@ -471,6 +504,56 @@ function Notices({
           <span>{notice}</span>
         </div>
       ))}
+    </div>
+  );
+}
+
+/**
+ * CDXC:WorkMode 2026-10-09 DECISION:
+ * User: when `gh` cannot read GitHub Projects, "Ask user to run that command if needed with a closable notice on the page that appears once": it shows the command with a Copy button, and closing it is remembered (gxserver, `/api/dismissWorkNotice`).
+ */
+function GithubProjectsNotice({
+  data,
+  onDismiss,
+}: {
+  data: WorkListData | null;
+  onDismiss: (notice: string) => void;
+}) {
+  const status = data?.githubProjects;
+  if (
+    data?.tracker !== "github" ||
+    status?.access !== "missingScope" ||
+    status.noticeDismissed
+  )
+    return null;
+  return (
+    <div className="w-notice work-github-projects-notice">
+      <IconAlertTriangle size={14} />
+      <span className="w-notice-text">
+        To show GitHub Projects, run <code>{status.command}</code>
+      </span>
+      <button
+        type="button"
+        className="w-notice-action work-github-projects-copy"
+        title="Copy the command"
+        onClick={() =>
+          void navigator.clipboard
+            ?.writeText(status.command)
+            .catch(() => undefined)
+        }
+      >
+        <IconCopy size={13} />
+        Copy
+      </button>
+      <button
+        type="button"
+        className="w-notice-close work-github-projects-close"
+        aria-label="Close"
+        title="Close"
+        onClick={() => onDismiss("githubProjectsScope")}
+      >
+        <IconX size={13} />
+      </button>
     </div>
   );
 }
@@ -578,6 +661,12 @@ function WorkRow({
           <span className="w-meta">
             <IconBox size={12} className="c-linear" />
             {item.linearProject.name}
+          </span>
+        ) : null}
+        {item.githubProject ? (
+          <span className="w-meta">
+            <IconBox size={12} />
+            {item.githubProject.name}
           </span>
         ) : null}
         {item.assignee ? (

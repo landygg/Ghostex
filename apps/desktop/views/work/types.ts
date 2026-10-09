@@ -6,6 +6,9 @@
 
 export type WorkItemKind = "linearIssue" | "githubIssue" | "pullRequest";
 
+/** Linear tickets & projects, or GitHub issues & projects. */
+export type WorkTracker = "linear" | "github";
+
 export type WorkStatusGroup =
   | "backlog"
   | "todo"
@@ -65,6 +68,8 @@ export interface WorkItem {
   projectId?: string;
   projectName?: string;
   linearProject?: WorkItemLink;
+  /** The GitHub Project a GitHub issue or PR is in (a GitHub workspace only). */
+  githubProject?: WorkItemLink;
   cycle?: string;
   labels: string[];
   assignee?: WorkItemPerson;
@@ -92,6 +97,14 @@ export interface WorkList {
   projects: WorkProject[];
   viewer: { githubLogin?: string | null };
   linearConfigured: boolean;
+  /** The workspace's primary tracker (server/src/work_mode/tracker.rs): whose tickets the list shows. */
+  tracker?: WorkTracker;
+  /** Whether `gh` may read GitHub Projects, the command that lets it, and whether its notice was closed. */
+  githubProjects?: {
+    access: "granted" | "missingScope" | "unknown";
+    command: string;
+    noticeDismissed: boolean;
+  };
   ghAvailable: boolean;
   errors: string[];
   generatedAt: string;

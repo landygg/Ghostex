@@ -148,14 +148,15 @@ pub(super) fn linear_graphql(
     Ok(body)
 }
 
-/// Checks a key and says whose it is: `{ name, organization }`.
+/// Checks a key and says whose it is: `{ id, name, organization }` (`id` is the Linear user's).
 pub(crate) fn verify_linear_api_key(api_key: &str) -> Result<Value, String> {
     let body = linear_graphql(
         api_key,
-        "query { viewer { name email } organization { name urlKey } }",
+        "query { viewer { id name email } organization { name urlKey } }",
         json!({}),
     )?;
     Ok(json!({
+        "id": body.pointer("/data/viewer/id").cloned().unwrap_or(Value::Null),
         "name": body.pointer("/data/viewer/name").cloned().unwrap_or(Value::Null),
         "organization": body.pointer("/data/organization/name").cloned().unwrap_or(Value::Null),
     }))

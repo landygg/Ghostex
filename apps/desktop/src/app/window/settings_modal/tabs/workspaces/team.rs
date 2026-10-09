@@ -1,17 +1,21 @@
 //! A Work workspace's Team rows: its connection to the team's own Convex project (join with an
 //! invite link, copy an invite link, leave), the team's Slack app (manifest, whether its secrets
-//! are stored, this person's Slack user) and the team-wide Linear key. It reads
-//! `/api/readTeamSyncStatus` and writes through `/api/joinTeamSync`, `/api/createTeamSyncInvite`,
-//! `/api/leaveTeamSync`, `/api/setTeamSyncIdentity` and `/api/readSlackManifest`.
+//! are stored, this person's Slack user), the team-wide Linear key and this member's own key. It
+//! reads `/api/readTeamSyncStatus` and writes through `/api/joinTeamSync`,
+//! `/api/createTeamSyncInvite`, `/api/leaveTeamSync`, `/api/setTeamSyncIdentity`,
+//! `/api/readSlackManifest`, `/api/setTeamLinearKey` and `/api/setOwnLinearKey`.
 //!
 //! CDXC:TeamSync 2026-10-09 WHY:
-//! Setting up a team, storing the Slack secrets and the team's Linear key all run the Convex CLI
-//! with the login of the person who deployed the team, which only a terminal on their computer has.
-//! So those rows show the one `ghostex team …` command to run instead of a field; no secret value
-//! ever comes back from the team, only whether it is set.
+//! Setting up a team and storing the Slack secrets run the Convex CLI with the login of the person
+//! who deployed the team, which only a terminal on their computer has, so those rows show the one
+//! `ghostex team …` command to run instead of a field. The team's Linear key is stored through the
+//! owner's member token instead, so owners get a field. No secret value ever comes back from the
+//! team, only whether it is set.
 //! SEE-ALSO: server/src/team_sync/operations.rs, server/src/ghostex_cli/team_slack.rs,
 //! packages/team-sync/convex/teams.ts (`info.secrets`).
-use super::super::super::fields::{ButtonVariant, RowSpec, setting_row, settings_button};
+use super::super::super::fields::{
+    ButtonVariant, RowSpec, setting_row, settings_button, switch_control,
+};
 use super::super::super::store::{store_copy_to_clipboard, store_gxserver_rpc};
 use super::*;
 
@@ -401,7 +405,8 @@ impl WorkspacesTab {
         rows.push(self.slack_row(p, workspace_id, cx));
         rows.push(self.slack_secrets_row(p, workspace_id, workspace_name, cx));
         rows.push(self.slack_user_row(p, workspace_id, busy, window, cx));
-        rows.push(self.team_linear_row(p, workspace_id, workspace_name, cx));
+        rows.push(self.team_linear_row(p, workspace_id, workspace_name, busy, window, cx));
+        rows.push(self.own_linear_key_row(p, workspace_id, busy, cx));
         rows
     }
 
@@ -703,39 +708,227 @@ impl WorkspacesTab {
         )
     }
 
+    fn save_team_linear_key(&mut self, workspace_id: String, cx: &mut Context<Self>) {
+        let input_id = SharedString::from(format!("team-linear-key-{workspace_id}"));
+        let key = self.draft(&input_id).trim().to_string();
+        if key.is_empty() {
+            return;
+        }
+        self.team_write(
+            workspace_id.clone(),
+            "/api/setTeamLinearKey",
+            json!({ "workspaceId": workspace_id, "apiKey": key }),
+            "Couldn't save the team's Linear key",
+            move |page, _, _| {
+                page.drafts.remove(&input_id);
+                page.fields.texts.remove(&input_id);
+            },
+            cx,
+        );
+    }
+
+    fn remove_team_linear_key(&mut self, workspace_id: String, cx: &mut Context<Self>) {
+        self.team_write(
+            workspace_id.clone(),
+            "/api/setTeamLinearKey",
+            json!({ "workspaceId": workspace_id }),
+            "Couldn't remove the team's Linear key",
+            |_, _, _| {},
+            cx,
+        );
+    }
+
+    fn set_own_linear_key(&mut self, workspace_id: String, enabled: bool, cx: &mut Context<Self>) {
+        self.team_write(
+            workspace_id.clone(),
+            "/api/setOwnLinearKey",
+            json!({ "workspaceId": workspace_id, "enabled": enabled }),
+            if enabled {
+                "Couldn't use your own Linear key"
+            } else {
+                "Couldn't stop using your own Linear key"
+            },
+            |_, _, _| {},
+            cx,
+        );
+    }
+
+    /// The team's Linear key: owners paste, replace or remove it; members see whether it is set.
+    ///
+    /// CDXC:TeamSync 2026-10-09 DECISION:
+    /// User: "let's just use 1 key from the owner but also allow the user to override by setting
+    /// their own key". Only owners set or remove the team's key; tickets created with it show the
+    /// key's owner as the creator in Linear, which the row's tooltip says.
     fn team_linear_row(
         &mut self,
         p: &SettingsPalette,
         workspace_id: &str,
         workspace_name: &str,
+        busy: bool,
+        window: &mut Window,
         cx: &mut Context<Self>,
     ) -> AnyElement {
-        let stored = self
-            .team
-            .get(workspace_id)
-            .and_then(|state| state.secret("linearApiKey"));
-        let command = team_command("linear-connect", workspace_name);
-        let status = match stored {
-            Some(true) => "Set in your team's Convex project (lin_api_••••••••••••).",
-            Some(false) => {
-                "Not set: Slack commands can't find or create tickets while your computer is off."
-            }
-            None => "Deploy the team's functions again to see whether it is set.",
+        let state = self.team.get(workspace_id);
+        let owner = state.is_some_and(TeamConnectionState::is_owner);
+        let stored = state.and_then(|state| state.secret("linearApiKey"));
+        let team_key = state
+            .and_then(|state| state.connection.as_ref())
+            .and_then(|connection| connection.pointer("/team/linearKeys/team"))
+            .filter(|key| key.is_object())
+            .cloned();
+        let named = |key: &str| {
+            team_key
+                .as_ref()
+                .and_then(|team| team.get(key))
+                .and_then(Value::as_str)
+                .map(str::to_string)
+        };
+        let account = named("linearUserName");
+        let creator = account
+            .clone()
+            .or_else(|| named("setByName"))
+            .unwrap_or_else(|| "the key's owner".to_string());
+        let set_by = named("setByName")
+            .map(|name| format!("Set by {name}"))
+            .unwrap_or_else(|| "Set".to_string());
+        let on_account = account
+            .map(|account| format!(" with {account}'s Linear account"))
+            .unwrap_or_default();
+        let description = match (stored, owner) {
+            (Some(true), true) => format!(
+                "{set_by}{on_account}. Slack commands find and create tickets with it, so tickets created with it show {creator} as the creator in Linear. Paste a new key to replace it, or run {} in a terminal.",
+                team_command("linear-connect", workspace_name)
+            ),
+            (Some(true), false) => format!(
+                "{set_by}{on_account}. Tickets created from Slack use it and show {creator} as the creator in Linear, unless you create yours with your own key below. Only the team's owners can change it."
+            ),
+            (Some(false), true) => "Not set: Slack commands can't find or create tickets while your computer is off. Paste a Linear API key (Linear → Settings → Security & access → Personal API keys); tickets created with it show the key's owner as the creator in Linear.".to_string(),
+            (Some(false), false) => "Not set: Slack commands can't find or create tickets while your computer is off. Ask one of the team's owners to set it.".to_string(),
+            (None, _) => "Deploy the team's functions again to see whether it is set.".to_string(),
+        };
+        let readout = match stored {
+            Some(true) => set_by.clone(),
+            Some(false) => "Not set".to_string(),
+            None => "Unknown".to_string(),
+        };
+        let control = if owner && stored.is_some() {
+            let input_id = SharedString::from(format!("team-linear-key-{workspace_id}"));
+            let input = self.draft_input(&input_id, "", "lin_api_…", window, cx);
+            super::super::accounts::widgets::sync_masked(
+                &mut self.masked,
+                &input_id,
+                &input,
+                true,
+                window,
+                cx,
+            );
+            let empty = self.draft(&input_id).trim().is_empty();
+            let save_workspace = workspace_id.to_string();
+            let remove_workspace = workspace_id.to_string();
+            h_flex()
+                .gap(px(8.0))
+                .child(settings_text_input(
+                    p,
+                    &input,
+                    Some(180.0),
+                    true,
+                    window,
+                    cx,
+                ))
+                .child(settings_button(
+                    p,
+                    SharedString::from(format!("team-linear-save-{workspace_id}")),
+                    "Save",
+                    None,
+                    ButtonVariant::Outline,
+                    busy || empty,
+                    None,
+                    move |page: &mut Self, _window, cx| {
+                        page.save_team_linear_key(save_workspace.clone(), cx)
+                    },
+                    cx,
+                ))
+                .when(stored == Some(true), |row| {
+                    row.child(settings_button(
+                        p,
+                        SharedString::from(format!("team-linear-remove-{workspace_id}")),
+                        "Remove",
+                        None,
+                        ButtonVariant::Ghost,
+                        busy,
+                        None,
+                        move |page: &mut Self, _window, cx| {
+                            page.remove_team_linear_key(remove_workspace.clone(), cx)
+                        },
+                        cx,
+                    ))
+                })
+                .into_any_element()
+        } else {
+            div().into_any_element()
         };
         setting_row(
             p,
             format!("team-linear-{workspace_id}"),
             RowSpec::new("Linear for the team")
-                .readout(match stored {
-                    Some(true) => "Set",
-                    Some(false) => "Not set",
-                    None => "Unknown",
-                })
-                .description(format!(
-                "{status} The team-wide key Slack commands use, separate from your own Linear key above. Run {command} in a terminal where the team was deployed and paste the key."
-            )),
+                .readout(readout)
+                .description(description),
             None,
-            self.command_button(p, format!("team-linear-copy-{workspace_id}"), command, cx),
+            control,
+            cx,
+        )
+    }
+
+    /// "Create my Slack tickets with my own Linear key": this workspace's Linear key, kept in the
+    /// team's Convex project for this member only (server/src/team_sync/linear_keys.rs).
+    fn own_linear_key_row(
+        &mut self,
+        p: &SettingsPalette,
+        workspace_id: &str,
+        busy: bool,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        let connection = self
+            .team
+            .get(workspace_id)
+            .and_then(|state| state.connection.clone())
+            .unwrap_or_default();
+        let enabled = connection.get("ownLinearKey").and_then(Value::as_bool) == Some(true);
+        let stored = connection
+            .pointer("/team/linearKeys/mine")
+            .is_some_and(Value::is_object);
+        let has_key =
+            self.has_linear_key(workspace_id) || self.has_linear_key(DEFAULT_WORKSPACE_ID);
+        let admins = "The key is stored in your team's Convex project for you only; the team's Convex admins can technically read it.";
+        let description = match (enabled, stored, has_key) {
+            (true, true, _) => format!(
+                "On: tickets you request from Slack are created with this workspace's Linear key, so Linear shows you as their creator; everything else uses the team's key. Ghostex updates it when you change the key above and removes it when you turn this off or leave the team. {admins}"
+            ),
+            (true, false, false) => "On, but this workspace has no Linear key, so your tickets use the team's key. Save your Linear API key above.".to_string(),
+            (true, false, true) => "On, but your key isn't stored in the team yet. Turn it off and on again to retry.".to_string(),
+            (false, _, _) => format!(
+                "Off: tickets you request from Slack are created with the team's key. Turn on to have Linear show you as their creator: Ghostex stores this workspace's Linear key in the team and keeps it up to date. {admins}"
+            ),
+        };
+        let disabled_reason = (!enabled && !has_key)
+            .then(|| SharedString::from("Save this workspace's Linear API key first."));
+        let toggle_workspace = workspace_id.to_string();
+        setting_row(
+            p,
+            format!("team-own-linear-{workspace_id}"),
+            RowSpec::new("Create my Slack tickets with my own Linear key").description(description),
+            None,
+            switch_control(
+                p,
+                SharedString::from(format!("team-own-linear-switch-{workspace_id}")),
+                enabled,
+                busy || disabled_reason.is_some(),
+                disabled_reason,
+                move |page: &mut Self, checked, _window, cx| {
+                    page.set_own_linear_key(toggle_workspace.clone(), checked, cx)
+                },
+                cx,
+            ),
             cx,
         )
     }

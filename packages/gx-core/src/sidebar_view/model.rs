@@ -935,6 +935,7 @@ fn project_context(
         bot_runs_today: project.bot_runs_today.unwrap_or_default(),
         work_mode: project.work_mode,
         work_linear: project.work_linear,
+        work_github: project.work_mode && project.work_tracker.as_deref() == Some("github"),
     })
 }
 

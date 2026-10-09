@@ -18,6 +18,7 @@ mod work_links;
 mod work_mode;
 mod workspaces;
 mod work_tickets;
+mod work_tracker;
 
 use agents::route_agents_http;
 use chat::route_chat_http;
@@ -36,3 +37,4 @@ use work_links::route_work_links_http;
 use work_mode::route_work_mode_http;
 use workspaces::route_workspaces_http;
 use work_tickets::route_work_tickets_http;
+use work_tracker::route_work_tracker_http;

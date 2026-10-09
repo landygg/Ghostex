@@ -2,6 +2,7 @@ import { ConvexError, v } from "convex/values";
 import { internal } from "./_generated/api";
 import { internalAction, internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import { FUNCTIONS_VERSION, newSecret, requireMember, sha256Hex } from "./lib/auth";
+import { linearKeyStatus } from "./linearKeys";
 
 /**
  * Creates the team and its owner, and returns the owner's member token.
@@ -70,6 +71,7 @@ export const info = query({
     const me = await requireMember(ctx, args.memberToken);
     const team = await ctx.db.get(me.teamId);
     if (!team) throw new ConvexError("This member's team no longer exists.");
+    const linearKeys = await linearKeyStatus(ctx, me);
     const members = await ctx.db
       .query("members")
       .withIndex("by_team", (q) => q.eq("teamId", team._id))
@@ -86,8 +88,9 @@ export const info = query({
       secrets: {
         slackBotToken: Boolean(process.env.SLACK_BOT_TOKEN),
         slackSigningSecret: Boolean(process.env.SLACK_SIGNING_SECRET),
-        linearApiKey: Boolean(process.env.LINEAR_API_KEY),
+        linearApiKey: linearKeys.team !== null,
       },
+      linearKeys,
       me: {
         id: me._id,
         name: me.name,

@@ -1,5 +1,6 @@
 //! Team sync routes (crate::team_sync): a workspace's connection to its team's Convex project
-//! (join, connect, leave, invite, identity, status, ping) and the reads the Work page uses
+//! (join, connect, leave, invite, identity, status, ping, the team's and this member's Linear
+//! keys) and the reads the Work page uses
 //! (`listTicketSlackThreads`). Every one is full-local: they hold or use the member token.
 
 use serde_json::{Map, Value};
@@ -23,6 +24,8 @@ fn team_sync_operation(path: &str) -> Option<TeamSyncOperation> {
         "/api/pingTeamSync" => team_sync::ping_team,
         "/api/listTeamSyncCommands" => team_sync::recent_commands,
         "/api/listTicketSlackThreads" => team_sync::list_ticket_slack_threads,
+        "/api/setTeamLinearKey" => team_sync::set_team_linear_key,
+        "/api/setOwnLinearKey" => team_sync::set_own_linear_key,
         _ => return None,
     })
 }

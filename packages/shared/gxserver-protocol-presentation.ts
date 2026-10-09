@@ -141,6 +141,8 @@ export interface GxserverPresentationProject {
   workMode?: true;
   /** Work mode is on and a Linear key is set for this project; present only when true. */
   workLinear?: true;
+  /** The primary tracker of the project's workspace (server/src/work_mode/tracker.rs); present only with work mode on. */
+  workTracker?: "linear" | "github";
   /** The workspace this project belongs to (server/src/workspaces/); absent = the default workspace. */
   workspaceId?: string;
   /** The project shows in every workspace (the Ghostex config folder's project, home of the Help chats); present only when true. */
@@ -286,6 +288,8 @@ export interface GxserverPresentationSessionWork {
   githubIssues?: Array<{ number: number; title?: string; state?: "open" | "closed"; url?: string }>;
   /** A Linear project is a release the team works on, never a repo. */
   linearProject?: { name: string; url?: string };
+  /** A GitHub Project (Projects v2), instead of `linearProject` when the workspace's primary tracker is GitHub. */
+  githubProject?: { owner: string; number: number; title?: string; url?: string; status?: string };
   /** Some link was set by hand, so "Back to automatic" has something to undo. */
   handSet?: true;
   /** The linked PR is merged and its Clean up / Keep offer is unanswered (server/src/work_mode/cleanup.rs). */
@@ -570,6 +574,8 @@ export interface GxserverSidebarWorkspace {
   kind: "work" | "personal";
   letter: string;
   name: string;
+  /** The primary tracker picked on this computer (server/src/work_mode/tracker.rs); absent = never picked. */
+  tracker?: "linear" | "github";
   workspaceId: string;
 }
 

@@ -215,6 +215,14 @@ pub fn fetch_live_gxserver_session_list(flags: &Flags) -> CliResult<Value> {
         "customSessionTags",
         snapshot.and_then(|snapshot| snapshot.get("customSessionTags")),
     );
+    // CDXC:Workspaces 2026-10-09 WHY: the phone's workspace switcher lists this computer's workspaces and filters projects and Spaces by them, and it reaches gxserver only through this CLI, so the workspaces document rides the same result. Absent on a daemon without workspaces, and while the Workspaces extension is off, which is what hides the phone's switcher and filter.
+    insert_present(
+        &mut result,
+        "sidebarWorkspaces",
+        snapshot
+            .filter(|_| crate::workspaces::workspaces_feature_enabled())
+            .and_then(|snapshot| snapshot.get("sidebarWorkspaces")),
+    );
     /*
      * CDXC:StateSync 2026-07-29-00:00:
      * Machine-scoped capability flags travel with the inventory so a client

@@ -108,6 +108,12 @@ pub(crate) fn project_presentation_project(project: &Value) -> Value {
         if crate::work_mode::project_has_linear_key(project) {
             output.insert("workLinear".to_string(), Value::Bool(true));
         }
+        if let Some(project_id) = project.get("projectId").and_then(Value::as_str) {
+            output.insert(
+                "workTracker".to_string(),
+                json!(crate::work_mode::cached_project_work_tracker(project_id).as_wire()),
+            );
+        }
     }
     if crate::workspaces::workspaces_feature_enabled() {
         if let Some(workspace_id) = crate::workspaces::stored_project_workspace_id(project) {

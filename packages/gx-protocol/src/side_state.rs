@@ -141,6 +141,10 @@ pub struct SidebarWorkspace {
     /// The saved Claude account (`/api/agentAccounts` id) this workspace's agents launch with.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub claude_account_id: Option<String>,
+    /// `linear` or `github`: the primary tracker picked on this computer (server/src/work_mode/
+    /// tracker.rs). Absent = never picked; a team's own choice is not in this document.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tracker: Option<String>,
 }
 
 impl SidebarWorkspace {

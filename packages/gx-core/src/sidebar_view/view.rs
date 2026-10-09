@@ -173,6 +173,9 @@ pub struct ProjectContextView {
     pub work_mode: bool,
     /// Work mode is on and a Linear key is set, so its menu offers Create Linear ticket.
     pub work_linear: bool,
+    /// Work mode is on and the workspace's primary tracker is GitHub (issues and GitHub Projects),
+    /// so its menu offers Create GitHub issue and Link to offers GitHub issues and projects.
+    pub work_github: bool,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]

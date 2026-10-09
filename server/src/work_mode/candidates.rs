@@ -34,6 +34,7 @@ pub(crate) enum WorkLinkKind {
     LinearIssue,
     LinearProject,
     GithubIssue,
+    GithubProject,
 }
 
 impl WorkLinkKind {
@@ -43,6 +44,7 @@ impl WorkLinkKind {
             "linearIssue" => Some(Self::LinearIssue),
             "linearProject" => Some(Self::LinearProject),
             "githubIssue" => Some(Self::GithubIssue),
+            "githubProject" => Some(Self::GithubProject),
             _ => None,
         }
     }
@@ -53,6 +55,7 @@ impl WorkLinkKind {
             Self::LinearIssue => "linearIssue",
             Self::LinearProject => "linearProject",
             Self::GithubIssue => "githubIssue",
+            Self::GithubProject => "githubProject",
         }
     }
 }
@@ -119,11 +122,11 @@ pub(crate) fn list_work_link_candidates(
         WorkLinkKind::PullRequest | WorkLinkKind::GithubIssue => match cwd.as_deref() {
             None => (
                 Vec::new(),
-                Some("This session has no folder to ask GitHub about."),
+                Some("This session has no folder to ask GitHub about.".to_string()),
             ),
             Some(_) if !gh_cli_is_available() => (
                 Vec::new(),
-                Some("Install the GitHub CLI (gh) and sign in to see suggestions."),
+                Some("Install the GitHub CLI (gh) and sign in to see suggestions.".to_string()),
             ),
             Some(cwd) => (
                 cached(kind, cwd, query, || {
@@ -136,6 +139,34 @@ pub(crate) fn list_work_link_candidates(
                 None,
             ),
         },
+        WorkLinkKind::GithubProject => match cwd.as_deref() {
+            _ if !gh_cli_is_available() => (
+                Vec::new(),
+                Some("Install the GitHub CLI (gh) and sign in to see suggestions.".to_string()),
+            ),
+            cwd => {
+                let owner = cwd
+                    .and_then(github_repo_of)
+                    .and_then(|repo| repo.split_once('/').map(|(owner, _)| owner.to_string()));
+                // Listed once per owner (cached); typing filters that list here.
+                let mut failure = None;
+                let all = cached(kind, owner.as_deref().unwrap_or("@me"), "", || {
+                    list_project_candidates(owner.as_deref())
+                        .map_err(|error| failure = Some(error))
+                        .ok()
+                });
+                let query = query.to_lowercase();
+                let found: Vec<Candidate> = all
+                    .into_iter()
+                    .filter(|candidate| {
+                        query.is_empty()
+                            || candidate.label.to_lowercase().contains(&query)
+                            || candidate.value.to_lowercase().contains(&query)
+                    })
+                    .collect();
+                (found, failure)
+            }
+        },
         WorkLinkKind::LinearIssue | WorkLinkKind::LinearProject => {
             match linear_api_key(
                 paths,
@@ -144,7 +175,10 @@ pub(crate) fn list_work_link_candidates(
             ) {
                 None => (
                     Vec::new(),
-                    Some("Add a Linear API key (ghostex work-mode linear-key) to see suggestions."),
+                    Some(
+                        "Add a Linear API key (ghostex work-mode linear-key) to see suggestions."
+                            .to_string(),
+                    ),
                 ),
                 Some(key) => {
                     let scope = format!("{:x}", linear_key_fingerprint(&key));
@@ -203,6 +237,9 @@ fn linked_values(kind: WorkLinkKind, targets: &WorkTargets) -> Vec<String> {
             .iter()
             .map(|number| number.to_string())
             .collect(),
+        WorkLinkKind::GithubProject => session_github_project(targets)
+            .map(|project| vec![project.reference()])
+            .unwrap_or_default(),
         WorkLinkKind::LinearProject => match &targets.linear_project {
             Some(Some(name)) => vec![name.clone()],
             Some(None) => Vec::new(),
@@ -365,6 +402,37 @@ fn github_repo_from_remote(url: &str) -> Option<String> {
     let owner = parts.next().filter(|part| !part.is_empty())?;
     let repo = parts.next()?.trim_end_matches(".git");
     (!repo.is_empty()).then(|| format!("{owner}/{repo}").to_ascii_lowercase())
+}
+
+/// The GitHub Projects of the repo's owner, then the person's own (`gh project list`). `Err` is the
+/// picker's notice (the missing `read:project` scope).
+fn list_project_candidates(owner: Option<&str>) -> Result<Vec<Candidate>, String> {
+    let mut candidates: Vec<Candidate> = Vec::new();
+    let owners = owner.into_iter().chain(std::iter::once("@me"));
+    for (index, owner) in owners.enumerate() {
+        let projects = match list_github_projects(owner) {
+            Ok(projects) => projects,
+            // The person's own list is a bonus; the repo owner's failure is the answer.
+            Err(error) if index == 0 || candidates.is_empty() => return Err(error),
+            Err(_) => continue,
+        };
+        for project in projects {
+            let value = project.reference();
+            let title = project.title.clone().unwrap_or_default();
+            if candidates.iter().any(|candidate| candidate.value == value) {
+                continue;
+            }
+            candidates.push(Candidate {
+                label: if title.is_empty() { value.clone() } else { title },
+                detail: Some(value.clone()),
+                value,
+                title: String::new(),
+                url: project.url.clone(),
+                own_repo: index == 0 && owner != "@me",
+            });
+        }
+    }
+    Ok(candidates)
 }
 
 // --- Linear ------------------------------------------------------------------------------------

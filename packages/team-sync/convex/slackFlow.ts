@@ -5,7 +5,6 @@ import { internalAction } from "./_generated/server";
 import {
   createLinearIssue,
   findLinearProject,
-  hasLinearKey,
   linearIssue,
   linearTeams,
   type LinearIssue,
@@ -50,6 +49,11 @@ type FlowContext = {
   sourcePermalink: string | null;
   threadPermalink: string | null;
   teams: LinearTeam[];
+  /** The key that finds and reads tickets, and the key that creates them (`linearKeys:forFlow`). */
+  readKey: string | null;
+  createKey: string | null;
+  /** A GitHub issue the requester's Ghostex created for this request. */
+  createdKey: string | null;
   note: Note;
   /** Working threads whose link the source thread still has to get. */
   sourceLinks: { label: string; permalink: string | null; channelId: string }[];
@@ -80,7 +84,12 @@ function errorText(error: unknown): string {
 
 /** Runs the flow for one request. With `chosenTickets`, the requester already picked from several. */
 export const handleRequest = internalAction({
-  args: { requestId: v.id("slackRequests"), chosenTickets: v.optional(v.array(v.string())) },
+  args: {
+    requestId: v.id("slackRequests"),
+    chosenTickets: v.optional(v.array(v.string())),
+    /** A GitHub issue the requester's Ghostex just created for this request (slackGithubIssue.ts). */
+    createdTicket: v.optional(v.string()),
+  },
   handler: async (ctx, args): Promise<null> => {
     const loaded: LoadedRequest | null = await ctx.runQuery(internal.slackFlowState.loadRequest, {
       requestId: args.requestId,
@@ -97,7 +106,7 @@ export const handleRequest = internalAction({
         responseUrl: request.responseUrl,
       });
     try {
-      const outcome = await runFlow(ctx, loaded, args.chosenTickets ?? null, note);
+      const outcome = await runFlow(ctx, loaded, args.chosenTickets ?? null, note, args.createdTicket ?? null);
       await ctx.runMutation(internal.slackFlowState.finishRequest, {
         requestId: request._id,
         status: outcome.status,
@@ -121,7 +130,13 @@ type FlowOutcome =
   | { status: "waitingForChoice"; candidates: string[] }
   | { status: "done"; tickets: Record<string, unknown>[] };
 
-async function runFlow(ctx: ActionCtx, loaded: LoadedRequest, chosenTickets: string[] | null, note: Note): Promise<FlowOutcome> {
+async function runFlow(
+  ctx: ActionCtx,
+  loaded: LoadedRequest,
+  chosenTickets: string[] | null,
+  note: Note,
+  createdKey: string | null,
+): Promise<FlowOutcome> {
   const { request, settings } = loaded;
   const watchOnly = settings.watchOnlyChannelIds.includes(request.channelId);
 
@@ -146,8 +161,28 @@ async function runFlow(ctx: ActionCtx, loaded: LoadedRequest, chosenTickets: str
       messages: messages.map(storableMessage),
     });
   }
-  const teams = hasLinearKey() ? await linearTeams() : [];
-  const flow: FlowContext = { loaded, thread, names, requesterName, sourcePermalink, threadPermalink, teams, note, sourceLinks: [] };
+  const { readKey, createKey } = await ctx.runQuery(internal.linearKeys.forFlow, {
+    teamId: request.teamId,
+    memberId: loaded.requester?.id,
+  });
+  // CDXC:WorkMode 2026-10-09 DECISION:
+  // User: the workspace's primary tracker is "Linear Tickets & Projects or Github Issues & Projects". With GitHub, the flow finds GitHub issue (and PR) links in the thread and, with none, the requester's Ghostex creates the GitHub issue with `gh` when it claims the command (Convex has no GitHub token).
+  const githubPrimary = (settings.tracker ?? (readKey ? "linear" : "github")) === "github";
+  const teams = readKey && !githubPrimary ? await linearTeams(readKey) : [];
+  const flow: FlowContext = {
+    loaded,
+    thread,
+    names,
+    requesterName,
+    sourcePermalink,
+    threadPermalink,
+    teams,
+    readKey,
+    createKey,
+    createdKey,
+    note,
+    sourceLinks: [],
+  };
 
   // Step 2: find the ticket.
   let tickets: TicketRef[];
@@ -156,7 +191,7 @@ async function runFlow(ctx: ActionCtx, loaded: LoadedRequest, chosenTickets: str
   } else if (loaded.isWorkingThread && loaded.threadTicket) {
     tickets = [parseTicketKey(loaded.threadTicket)];
   } else {
-    tickets = findTickets(thread.searchText, teams.map((team) => team.key));
+    tickets = findTickets(thread.searchText, teams.map((team) => team.key)).filter((ticket) => !githubPrimary || ticket.kind === "github");
     if (tickets.length === 0 && loaded.threadTicket) tickets = [parseTicketKey(loaded.threadTicket)];
   }
   if (!chosenTickets && tickets.length > 1) {
@@ -169,6 +204,7 @@ async function runFlow(ctx: ActionCtx, loaded: LoadedRequest, chosenTickets: str
       await note("I couldn't find a ticket in this thread, so there's nothing to forward.");
       return { status: "done", tickets: [] };
     }
+    if (githubPrimary) return await queueGithubIssue(ctx, flow);
     createdTicket = await createTicketFromThread(flow);
     tickets = [{ kind: "linear", key: createdTicket.identifier }];
   }
@@ -211,7 +247,9 @@ function ticketLabel(ticket: TicketRef, issue: LinearIssue | null): string {
 async function askWhichTicket(flow: FlowContext, tickets: TicketRef[]): Promise<void> {
   const request = flow.loaded.request;
   const titles = await Promise.all(
-    tickets.map(async (ticket) => (ticket.kind === "linear" && hasLinearKey() ? (await linearIssue(ticket.key))?.title : null) ?? null),
+    tickets.map(async (ticket) =>
+      (ticket.kind === "linear" && flow.readKey ? (await linearIssue(flow.readKey, ticket.key))?.title : null) ?? null,
+    ),
   );
   const button = (text: string, value: string, index: number) => ({
     type: "button",
@@ -237,18 +275,22 @@ async function askWhichTicket(flow: FlowContext, tickets: TicketRef[]): Promise<
  *
  * CDXC:TeamSync 2026-10-09 DECISION:
  * User: the command never works without a Linear ticket; when the thread has none, Ghostex creates it automatically (project/team from the channel mapping) and links the Slack thread to it. When the thread or the channel mapping names a Linear project, the new ticket goes into it.
+ *
+ * CDXC:TeamSync 2026-10-09 DECISION:
+ * User: "let's just use 1 key from the owner but also allow the user to override by setting their own key". The ticket is created with the requester's own key when they stored one (Linear shows them as its creator), else with the team's key.
  */
 async function createTicketFromThread(flow: FlowContext): Promise<LinearIssue> {
   const { request, settings, requester } = flow.loaded;
-  if (!hasLinearKey()) {
+  const { createKey } = flow;
+  if (!createKey) {
     throw new Error(
-      "there's no ticket in this thread, and this team's Convex project has no Linear key to create one. Run `ghostex team linear-connect` in Ghostex.",
+      "there's no ticket in this thread, and this team has no Linear key to create one. Ask a team owner to set the team's Linear key in Ghostex (Settings → Workspaces → Linear for the team).",
     );
   }
   const mapping = settings.channelRepos.find((entry) => entry.channelId === request.channelId);
   // A project linked in the thread is the requester's own choice, so it wins over the channel's.
   const projectRef = findLinearProjectLinks(flow.thread.searchText)[0] ?? mapping?.linearProject ?? null;
-  let project = projectRef ? await findLinearProject(projectRef) : null;
+  let project = projectRef ? await findLinearProject(createKey, projectRef) : null;
   if (projectRef && !project) {
     await flow.note(`Linear has no project ${projectRef}, so the new ticket has no project.`);
   }
@@ -274,13 +316,55 @@ async function createTicketFromThread(flow: FlowContext): Promise<LinearIssue> {
     `> ${request.prompt || "(no prompt)"}`,
     ...(flow.thread.transcript ? ["", "**Slack thread**", "", "```", flow.thread.transcript, "```"] : []),
   ].join("\n");
-  return await createLinearIssue({
+  return await createLinearIssue(createKey, {
     teamId: team.id,
     title,
     description,
     assigneeId: requester?.linearUserId ?? undefined,
     projectId: project?.id,
   });
+}
+
+/**
+ * No GitHub issue in the thread of a GitHub team: the requester's Ghostex creates it (`slack.request` with `action: "createIssue"`, server/src/team_sync/slack_request.rs) in the repo the channel maps to, and the flow runs again with that issue once it reports back (slackFlowReport.ts).
+ */
+async function queueGithubIssue(ctx: ActionCtx, flow: FlowContext): Promise<FlowOutcome> {
+  const { request, settings } = flow.loaded;
+  const mapping = settings.channelRepos.find((entry) => entry.channelId === request.channelId) ?? null;
+  const fromThread = request.threadTs && request.messageTs !== request.threadTs ? flow.thread.rootText : "";
+  const title = titleFromText(fromThread || request.prompt) || "Request from Slack";
+  const body = [
+    `Requested by ${flow.requesterName} in Slack${flow.sourcePermalink ? `: ${flow.sourcePermalink}` : "."}`,
+    "",
+    `> ${request.prompt || "(no prompt)"}`,
+    ...(flow.thread.transcript ? ["", "**Slack thread**", "", "```", flow.thread.transcript, "```"] : []),
+  ].join("\n");
+  const queued = await ctx.runMutation(internal.slackGithubIssue.queueIssueCreation, {
+    requestId: request._id,
+    payload: {
+      action: "createIssue",
+      requestId: request._id,
+      title,
+      body,
+      repo: mapping ? { repo: mapping.repo, project: mapping.project } : null,
+      requester: { slackUserId: request.slackUserId, name: flow.requesterName },
+      source: {
+        kind: request.kind,
+        channelId: request.channelId,
+        threadTs: request.threadTs ?? null,
+        messageTs: request.messageTs ?? null,
+        permalink: flow.sourcePermalink,
+      },
+    },
+  });
+  if (!queued.assigned) {
+    await flow.note(
+      `There's no GitHub issue in this thread, and Ghostex doesn't know your Slack user yet, so no Ghostex can create one. In Ghostex, run \`ghostex team identity --slack-user ${request.slackUserId}\` and it starts right away.`,
+    );
+  } else if (!queued.online) {
+    await flow.note("There's no GitHub issue in this thread. Your Ghostex isn't running; it creates the issue and starts as soon as it's back.");
+  }
+  return { status: "done", tickets: [{ creatingGithubIssue: true, commandId: queued.commandId }] };
 }
 
 function quote(text: string, maxLines: number, maxChars: number): string {
@@ -351,8 +435,10 @@ async function workOnTicket(
   watchOnly: boolean,
 ): Promise<Record<string, unknown>> {
   const { request, settings } = flow.loaded;
-  const issue = createdTicket?.identifier === ticket.key ? createdTicket : ticket.kind === "linear" && hasLinearKey() ? await linearIssue(ticket.key) : null;
-  if (ticket.kind === "linear" && hasLinearKey() && !issue) throw new Error(`Linear has no ticket ${ticket.key}.`);
+  const { readKey } = flow;
+  const issue =
+    createdTicket?.identifier === ticket.key ? createdTicket : ticket.kind === "linear" && readKey ? await linearIssue(readKey, ticket.key) : null;
+  if (ticket.kind === "linear" && readKey && !issue) throw new Error(`Linear has no ticket ${ticket.key}.`);
   const inWorkingThread = flow.loaded.isWorkingThread && flow.loaded.threadTicket === ticket.key;
 
   let linkPostedAt: number | null = null;
@@ -451,7 +537,7 @@ async function workOnTicket(
       repo: mapping ? { repo: mapping.repo, project: mapping.project } : null,
       instructions: settings.instructions,
       images,
-      createdTicket: createdTicket?.identifier === ticket.key,
+      createdTicket: createdTicket?.identifier === ticket.key || flow.createdKey === ticket.key,
       openedWorkingThread,
       // What the requester's Ghostex needs to replace the post's quote with the thread's requirements.
       openingPost:
@@ -491,7 +577,7 @@ async function workOnTicket(
       );
     }
   } else if (!queued.online) {
-    const what = createdTicket?.identifier === ticket.key
+    const what = createdTicket?.identifier === ticket.key || flow.createdKey === ticket.key
       ? `I've created ${ticket.key}${openedWorkingThread ? " and its working thread" : ""}`
       : openedWorkingThread
         ? `I've opened ${ticket.key}'s working thread`
@@ -510,7 +596,7 @@ async function workOnTicket(
   }
   return {
     ticket: ticket.key,
-    createdTicket: createdTicket?.identifier === ticket.key,
+    createdTicket: createdTicket?.identifier === ticket.key || flow.createdKey === ticket.key,
     openedWorkingThread,
     action: queued.action,
     commandId: "commandId" in queued ? queued.commandId : null,

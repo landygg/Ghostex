@@ -236,6 +236,23 @@ impl GhostexGpuiApp {
                 tooltip: format!("Linear project: {}", project.name),
             });
         }
+        if let Some(project) = &work.github_project {
+            let label = project.label();
+            chips.push(Chip {
+                key: "github-project",
+                icon: "titlebar/box.svg",
+                icon_color: rgb(DRAFT_GREY).into(),
+                tooltip: match project.status.as_deref() {
+                    Some(status) => format!("GitHub project: {label} · {status}"),
+                    None => format!("GitHub project: {label}"),
+                },
+                label,
+                trailing: None,
+                url: project.url.clone(),
+                action: None,
+                work_item: None,
+            });
+        }
         if chips.is_empty() {
             return None;
         }

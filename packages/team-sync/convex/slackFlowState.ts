@@ -10,7 +10,7 @@ import { readTeamFlow } from "./teamFlow";
 /** A member whose Ghostex sent no heartbeat (every 2 minutes) for this long counts as offline. */
 const OFFLINE_AFTER_MS = 5 * 60 * 1000;
 
-async function memberForSlackUser(ctx: QueryCtx, teamId: Id<"teams">, slackUserId: string): Promise<Doc<"members"> | null> {
+export async function memberForSlackUser(ctx: QueryCtx, teamId: Id<"teams">, slackUserId: string): Promise<Doc<"members"> | null> {
   return (
     (
       await ctx.db
@@ -30,7 +30,7 @@ async function workingThreadOf(ctx: QueryCtx, teamId: Id<"teams">, ticket: strin
   return thread ? { threadId: thread._id, channelId: thread.channelId, threadTs: thread.threadTs, permalink: thread.permalink ?? null } : null;
 }
 
-function isOnline(member: Doc<"members"> | null, now: number): boolean {
+export function isOnline(member: Doc<"members"> | null, now: number): boolean {
   return member !== null && (member.lastSeenAt ?? 0) > now - OFFLINE_AFTER_MS;
 }
 

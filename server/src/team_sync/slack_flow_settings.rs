@@ -1,6 +1,6 @@
 //! The team flow settings the Slack command flow reads (working channel, watch-only channels,
 //! channel → repo mapping, default run place, team instructions), the Slack app manifest, and the
-//! secrets the team's Convex deployment needs (`ghostex team slack-connect` / `linear-connect`).
+//! Slack secrets the team's Convex deployment needs (`ghostex team slack-connect`).
 
 use std::io::Write;
 use std::process::Stdio;
@@ -25,7 +25,14 @@ const TEAM_FLOW_FIELDS: &[&str] = &[
     "defaultRunPlace",
     "qcOwnerSlackUserId",
     "instructions",
+    // `linear` or `github`: the workspace's primary tracker (crate::work_mode::tracker).
+    "tracker",
 ];
+
+/// Whether this computer's member of the workspace is connected to a team.
+pub(crate) fn workspace_has_team(paths: &GxserverPaths, workspace_id: &str) -> bool {
+    super::connections::read_team_connection(paths, workspace_id).is_some()
+}
 
 /// `{ workspaceId }`: the team's flow settings.
 pub(crate) fn read_team_flow(

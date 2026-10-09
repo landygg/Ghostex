@@ -178,6 +178,18 @@ pub(super) fn to_mobile_session_list(result: &Value) -> Value {
                         if crate::work_mode::project_work_mode(project) {
                             project_map.insert("workMode".to_string(), json!(true));
                         }
+                        // CDXC:Workspaces 2026-10-09 SEE-ALSO: the phone filters by these exactly as gx-core `WindowWorkspace::shows_project` does (apps/mobile/app/src/workspaces/workspaceFilter.ts); sent under the presentation snapshot's own keys and rules.
+                        if crate::workspaces::workspaces_feature_enabled() {
+                            if let Some(workspace_id) =
+                                crate::workspaces::stored_project_workspace_id(project)
+                            {
+                                project_map
+                                    .insert("workspaceId".to_string(), json!(workspace_id));
+                            }
+                            if crate::workspaces::project_in_every_workspace(project) {
+                                project_map.insert("everyWorkspace".to_string(), json!(true));
+                            }
+                        }
                         Value::Object(project_map)
                     })
                     .collect(),
@@ -230,6 +242,10 @@ pub(super) fn to_mobile_session_list(result: &Value) -> Value {
     }
     if let Some(groups) = to_mobile_workspace_groups(result.get("workspaceGroups")) {
         map.insert("workspaceGroups".to_string(), groups);
+    }
+    // Already normalized by gxserver (`SidebarWorkspacesState`); the phone re-narrows it on parse.
+    if crate::workspaces::workspaces_feature_enabled() {
+        insert_present(&mut map, "sidebarWorkspaces", result.get("sidebarWorkspaces"));
     }
     Value::Object(map)
 }
@@ -418,17 +434,24 @@ fn to_mobile_sidebar_spaces(spaces_state: Option<&Value>) -> Option<Value> {
                 Some(Value::String(text)) if !text.is_empty() => text.clone(),
                 _ => "#4f5663".to_string(),
             };
-            spaces.insert(
-                space_id.clone(),
-                json!({
-                    "color": color,
-                    "icon": icon,
-                    "memberCollectionIds": member_ids("memberCollectionIds"),
-                    "memberProjectIds": member_ids("memberProjectIds"),
-                    "name": name,
-                    "spaceId": space_id,
-                }),
-            );
+            let mut row = json!({
+                "color": color,
+                "icon": icon,
+                "memberCollectionIds": member_ids("memberCollectionIds"),
+                "memberProjectIds": member_ids("memberProjectIds"),
+                "name": name,
+                "spaceId": space_id,
+            });
+            // The workspace the Space belongs to; absent = the default workspace.
+            if let Some(Value::String(workspace_id)) = space
+                .get("workspaceId")
+                .filter(|_| crate::workspaces::workspaces_feature_enabled())
+            {
+                if !workspace_id.is_empty() {
+                    row["workspaceId"] = json!(workspace_id);
+                }
+            }
+            spaces.insert(space_id.clone(), row);
         }
     }
     if spaces.is_empty() {

@@ -200,6 +200,19 @@ function WorkApp() {
     );
   };
 
+  // Hidden at once; gxserver remembers it for every window.
+  const dismissNotice = (notice: string) => {
+    setList((current) =>
+      current?.githubProjects && notice === "githubProjectsScope"
+        ? {
+            ...current,
+            githubProjects: { ...current.githubProjects, noticeDismissed: true },
+          }
+        : current,
+    );
+    void workRequest("work.dismissNotice", { notice }).catch(() => undefined);
+  };
+
   const openUrl = (url: string) => {
     void workRequest("work.openUrl", { url }).catch(() => undefined);
   };
@@ -243,6 +256,7 @@ function WorkApp() {
           onOpen={(item) => openRef(itemRef(item), item)}
           onNewTicket={newTicket}
           newTicketError={newTicketError}
+          onDismissNotice={dismissNotice}
           now={now}
         />
       ) : (

@@ -34,6 +34,8 @@ pub(crate) struct WorkProjectInput {
     pub(crate) repo: Option<String>,
     /// The workspace the project is in (a worktree project follows its parent checkout).
     pub(crate) workspace_id: String,
+    /// The workspace's primary tracker: whose tickets the list shows.
+    pub(crate) tracker: WorkTracker,
 }
 
 /// The work-mode projects a request names (all of them when it names none).
@@ -83,6 +85,7 @@ pub(crate) fn load_work_projects(
                 &project,
                 &all_projects,
             ),
+            tracker: project_work_tracker(&state.paths, &workspaces, &project, &all_projects),
             path,
             project_id,
             project,
@@ -111,7 +114,13 @@ pub(crate) fn work_feed_plan(projects: &[WorkProjectInput]) -> WorkFeedPlan {
     let mut repos_seen = HashSet::new();
     let mut github = Vec::new();
     for input in projects {
-        if let Some(api_key) = &input.linear_api_key {
+        // CDXC:WorkMode 2026-10-09 DECISION:
+        // User: the Work page lists the primary tracker's tickets (plus PRs): Linear tickets for a Linear workspace, GitHub issues for a GitHub one.
+        if let Some(api_key) = input
+            .linear_api_key
+            .as_ref()
+            .filter(|_| input.tracker == WorkTracker::Linear)
+        {
             let request = linear
                 .entry(linear_key_fingerprint(api_key))
                 .or_insert_with(|| LinearFeedRequest {
@@ -215,6 +224,9 @@ pub(crate) struct WorkItem {
     pub(crate) project_name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) linear_project: Option<WorkItemLink>,
+    /// The GitHub Project a GitHub issue or PR is in (title only; `gh` lists no link).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) github_project: Option<WorkItemLink>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) cycle: Option<String>,
     pub(crate) labels: Vec<String>,
@@ -442,6 +454,7 @@ pub(crate) fn build_work_list(projects: &[WorkProjectInput], plan: &WorkFeedPlan
                     name,
                     url: issue.project_url.clone(),
                 }),
+                github_project: None,
                 cycle: issue.cycle.clone(),
                 labels: issue.labels.clone(),
                 assigned_to_me: issue.assignee.as_ref().is_some_and(|person| person.is_me),
@@ -466,7 +479,10 @@ pub(crate) fn build_work_list(projects: &[WorkProjectInput], plan: &WorkFeedPlan
     // Linear tickets a sidebar session links that the feeds did not bring (another team's, or
     // one assigned to someone else), from the card caches.
     for link in &links {
-        let Some(input) = projects_by_id.get(link.session.project_id.as_str()) else {
+        let Some(input) = projects_by_id
+            .get(link.session.project_id.as_str())
+            .filter(|input| input.tracker == WorkTracker::Linear)
+        else {
             continue;
         };
         for identifier in &link.linear_issues {
@@ -505,6 +521,7 @@ pub(crate) fn build_work_list(projects: &[WorkProjectInput], plan: &WorkFeedPlan
                     name,
                     url: info.project_url.clone(),
                 }),
+                github_project: None,
                 cycle: None,
                 labels: Vec::new(),
                 assignee: None,
@@ -543,7 +560,13 @@ pub(crate) fn build_work_list(projects: &[WorkProjectInput], plan: &WorkFeedPlan
             .clone()
             .or_else(|| input.repo.clone())
             .unwrap_or_else(|| input.project_id.clone());
-        for issue in feed.issues {
+        // A Linear workspace's repos still list their PRs, but not their GitHub issues.
+        let issues = if input.tracker == WorkTracker::Github {
+            feed.issues
+        } else {
+            Vec::new()
+        };
+        for issue in issues {
             let key = format!("issue:{repo}#{}", issue.number);
             if index_by_key.contains_key(&key) {
                 continue;
@@ -557,13 +580,14 @@ pub(crate) fn build_work_list(projects: &[WorkProjectInput], plan: &WorkFeedPlan
                 title: issue.title.clone(),
                 url: issue.url.clone(),
                 updated_at: issue.updated_at.clone(),
-                status: WorkItemStatus {
-                    group: "todo",
-                    name: "Open".to_string(),
-                },
+                status: github_issue_status(issue.project.as_ref()),
                 project_id: Some(input.project_id.clone()),
                 project_name: Some(input.name.clone()),
                 linear_project: None,
+                github_project: issue.project.as_ref().map(|project| WorkItemLink {
+                    name: project.title.clone(),
+                    url: None,
+                }),
                 cycle: None,
                 labels: issue.labels.clone(),
                 assignee: issue
@@ -603,6 +627,18 @@ pub(crate) fn build_work_list(projects: &[WorkProjectInput], plan: &WorkFeedPlan
 
     for (repo, project_id, pull_request) in pull_requests {
         let id = (repo.clone(), pull_request.number);
+        let github_project = pull_request
+            .project
+            .as_ref()
+            .filter(|_| {
+                projects_by_id
+                    .get(project_id.as_str())
+                    .is_some_and(|input| input.tracker == WorkTracker::Github)
+            })
+            .map(|project| WorkItemLink {
+                name: project.title.clone(),
+                url: None,
+            });
         let head = pull_request.head_branch.as_deref().unwrap_or_default();
         let mut tickets: Vec<String> = Vec::new();
         if let Some(key) = session_pull_request_tickets.get(&id) {
@@ -647,6 +683,9 @@ pub(crate) fn build_work_list(projects: &[WorkProjectInput], plan: &WorkFeedPlan
                     .map(|input| input.name.clone());
                 item.project_id = Some(project_id.clone());
             }
+            if item.github_project.is_none() && item.kind == "githubIssue" {
+                item.github_project = github_project;
+            }
             item.assigned_to_me |= mine && item.assignee.is_none();
             if sort_time(pull_request.updated_at.as_deref()) > sort_time(item.updated_at.as_deref())
             {
@@ -684,6 +723,7 @@ pub(crate) fn build_work_list(projects: &[WorkProjectInput], plan: &WorkFeedPlan
                 .map(|input| input.name.clone()),
             project_id: Some(project_id.clone()),
             linear_project: None,
+            github_project,
             cycle: None,
             labels: Vec::new(),
             assignee: pull_request
@@ -761,6 +801,7 @@ pub(crate) fn build_work_list(projects: &[WorkProjectInput], plan: &WorkFeedPlan
             project_id: Some(input.project_id.clone()),
             project_name: Some(input.name.clone()),
             linear_project: None,
+            github_project: None,
             cycle: None,
             labels: Vec::new(),
             assignee: None,
@@ -806,8 +847,22 @@ pub(crate) fn build_work_list(projects: &[WorkProjectInput], plan: &WorkFeedPlan
             .cmp(&sort_time(a.updated_at.as_deref()))
             .then_with(|| a.key.cmp(&b.key))
     });
-    let linear_configured = projects.iter().any(|input| input.linear_api_key.is_some());
+    // Only a Linear workspace needs a Linear key; a GitHub one never shows the notice.
+    let linear_projects: Vec<&WorkProjectInput> = projects
+        .iter()
+        .filter(|input| input.tracker == WorkTracker::Linear)
+        .collect();
+    let linear_configured = linear_projects.is_empty()
+        || linear_projects
+            .iter()
+            .any(|input| input.linear_api_key.is_some());
+    let tracker = if projects.is_empty() || !linear_projects.is_empty() {
+        WorkTracker::Linear
+    } else {
+        WorkTracker::Github
+    };
     json!({
+        "tracker": tracker.as_wire(),
         "items": items,
         "projects": projects.iter().map(|input| json!({
             "projectId": input.project_id,
@@ -820,6 +875,30 @@ pub(crate) fn build_work_list(projects: &[WorkProjectInput], plan: &WorkFeedPlan
         "errors": errors,
         "generatedAt": generated_at,
     })
+}
+
+/// A GitHub issue's status: its project board's Status column when it has one (`In progress`,
+/// `In review`, `Done`), otherwise just open.
+fn github_issue_status(project: Option<&GithubListProject>) -> WorkItemStatus {
+    let Some(name) = project.and_then(|project| project.status.clone()) else {
+        return WorkItemStatus {
+            group: "todo",
+            name: "Open".to_string(),
+        };
+    };
+    let lower = name.to_ascii_lowercase();
+    let group = if lower.contains("review") {
+        "review"
+    } else if lower.contains("progress") || lower.contains("doing") {
+        "progress"
+    } else if lower.contains("done") || lower.contains("complete") || lower.contains("shipped") {
+        "done"
+    } else if lower.contains("backlog") || lower.contains("triage") || lower.contains("icebox") {
+        "backlog"
+    } else {
+        "todo"
+    };
+    WorkItemStatus { group, name }
 }
 
 /// Milliseconds since the epoch for sorting; rows without a time sort last.

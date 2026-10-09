@@ -96,6 +96,12 @@ pub(super) async fn route_work_mode_http(
         }
         // Off the async runtime: checking a key is a network call to Linear.
         "/api/setLinearApiKey" => {
+            // A workspace's (or the shared) key is what a team member's own Linear user and own
+            // key come from; a project's override is not.
+            let project_scoped = body_json
+                .pointer("/params/projectId")
+                .and_then(Value::as_str)
+                .is_some_and(|id| !id.trim().is_empty());
             let worker_state = state.clone();
             let worker_endpoint = endpoint.path.clone();
             let worker_request_id = request_id.clone();
@@ -110,6 +116,9 @@ pub(super) async fn route_work_mode_http(
             })
             .await;
             spawn_work_mode_refresh(&state);
+            if !project_scoped {
+                crate::team_sync::spawn_member_linear_key_sync(&state, None);
+            }
             match response {
                 Ok(response) => response,
                 Err(error) => domain_error_response(

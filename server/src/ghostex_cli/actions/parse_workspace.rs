@@ -377,5 +377,11 @@ pub(super) fn parse_clone_repository(rest: &[String], flags: &Flags) -> Value {
             Value::Bool(parse_boolean(value)),
         );
     }
+    // `--workspace <name|id>` puts the cloned project there, like add-project's.
+    set_or_remove(
+        &mut map,
+        "workspaceId",
+        flag_json(flags, "workspace").or_else(|| flag_json(flags, "workspaceId")),
+    );
     Value::Object(map)
 }

@@ -26,6 +26,30 @@ pub(crate) fn refresh_work_caches(paths: &GxserverPaths, projects: &[Value], ses
         return;
     }
 
+    // Which tracker each project uses (a team's choice is read from Convex at most every few
+    // minutes), remembered for the projection.
+    let workspaces = crate::storage::open_gxserver_database(paths)
+        .ok()
+        .and_then(|db| crate::workspaces::read_sidebar_workspaces(&db).ok())
+        .unwrap_or(Value::Null);
+    let mut team_workspaces: Vec<String> = projects_by_id
+        .values()
+        .map(|project| crate::workspaces::project_workspace_id(&workspaces, project, projects))
+        .collect();
+    team_workspaces.sort();
+    team_workspaces.dedup();
+    for workspace_id in &team_workspaces {
+        refresh_team_work_tracker(paths, workspace_id);
+    }
+    let mut github_tracker_projects: Vec<&str> = Vec::new();
+    for (project_id, project) in &projects_by_id {
+        let tracker = project_work_tracker(paths, &workspaces, project, projects);
+        remember_project_work_tracker(project_id, tracker);
+        if tracker == WorkTracker::Github {
+            github_tracker_projects.push(project_id);
+        }
+    }
+
     // Which key each project uses, remembered for the projection.
     let mut keys: HashMap<u64, String> = HashMap::new();
     for (project_id, project) in &projects_by_id {
@@ -104,6 +128,57 @@ pub(crate) fn refresh_work_caches(paths: &GxserverPaths, projects: &[Value], ses
             }
             if refresh_work_github_issue(cwd, *number) {
                 gh_budget -= 1;
+            }
+        }
+    }
+
+    // GitHub Projects, only for projects whose tracker is GitHub and while `gh` may read them.
+    if github_tracker_projects.is_empty() {
+        return;
+    }
+    if refresh_github_projects_access(false) == GithubProjectsAccess::MissingScope {
+        return;
+    }
+    for session in sessions {
+        if gh_budget == 0 {
+            break;
+        }
+        let Some(project) = session
+            .get("projectId")
+            .and_then(Value::as_str)
+            .filter(|project_id| github_tracker_projects.contains(project_id))
+            .and_then(|project_id| projects_by_id.get(project_id))
+        else {
+            continue;
+        };
+        let targets = work_targets(project, session);
+        match &targets.github_project {
+            Some(Some(reference)) => {
+                if let Some((owner, number)) = parse_github_project_reference(reference) {
+                    if refresh_github_project(&owner, number) {
+                        gh_budget -= 1;
+                    }
+                }
+            }
+            Some(None) => {}
+            None => {
+                let Some(cwd) = targets.cwd.as_deref() else {
+                    continue;
+                };
+                let numbers = targets.github_issues.iter().copied().chain(
+                    targets
+                        .pull_request
+                        .as_deref()
+                        .and_then(pull_request_number_of),
+                );
+                for number in numbers {
+                    if gh_budget == 0 {
+                        break;
+                    }
+                    if refresh_github_project_items(cwd, number) {
+                        gh_budget -= 1;
+                    }
+                }
             }
         }
     }

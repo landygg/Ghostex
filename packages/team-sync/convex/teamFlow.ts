@@ -2,7 +2,7 @@ import { ConvexError, v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { QueryCtx } from "./_generated/server";
 import { internalQuery, mutation, query } from "./_generated/server";
-import { requireMember } from "./lib/auth";
+import { isOwner, requireMember } from "./lib/auth";
 
 const MAX_INSTRUCTIONS_CHARS = 50_000;
 const MAX_CHANNELS = 200;
@@ -22,6 +22,8 @@ export type TeamFlowSettings = {
   defaultRunPlace: "cloud" | "local";
   qcOwnerSlackUserId: string | null;
   instructions: string | null;
+  /** `null`: never picked (Linear when the team has a Linear key, otherwise GitHub). */
+  tracker: "linear" | "github" | null;
   updatedAt: number | null;
 };
 
@@ -54,18 +56,19 @@ export async function readTeamFlow(ctx: QueryCtx, teamId: Id<"teams">): Promise<
     defaultRunPlace: row?.defaultRunPlace ?? "cloud",
     qcOwnerSlackUserId: row?.qcOwnerSlackUserId ?? null,
     instructions: row?.instructions ?? null,
+    tracker: row?.tracker ?? null,
     updatedAt: row?.updatedAt ?? null,
   };
 }
 
 /**
- * Whether a member may change the team flow settings. `get` reports it as `canEdit` and `set` enforces it, so Settings and the CLI follow this one rule.
+ * Whether a member may change the team flow (these settings and the team-flow steps in teamFlowSteps.ts). `get` reports it as `canEdit` and `set` enforces it, so Settings and the CLI follow this one rule.
  *
- * CDXC:TeamSync 2026-10-09 WHY:
- * Every member can edit until the user decides whether the team flow is owner-only; owner-only is `member.role === "owner"` here.
+ * CDXC:TeamSync 2026-10-09 DECISION:
+ * User: team flow settings are "Owners only". Members see them read-only.
  */
-function canEditTeamFlow(member: Doc<"members">): boolean {
-  return member.role === "owner" || member.role === "member";
+export function canEditTeamFlow(member: Doc<"members">): boolean {
+  return isOwner(member);
 }
 
 /** The team's flow settings, for `ghostex team flow` and the Team flow settings page. */
@@ -128,10 +131,15 @@ export const set = mutation({
     defaultRunPlace: v.optional(v.union(v.literal("cloud"), v.literal("local"))),
     qcOwnerSlackUserId: v.optional(v.union(v.string(), v.null())),
     instructions: v.optional(v.union(v.string(), v.null())),
+    /**
+     * CDXC:WorkMode 2026-10-09 DECISION:
+     * User: "in settings we need to say what is the primary for that workspace (Linear Tickets & Projects or Github Issues & Projects - Need to pick just 1)". A team workspace's choice lives here, with the other team flow settings (owners only).
+     */
+    tracker: v.optional(v.union(v.literal("linear"), v.literal("github"), v.null())),
   },
   handler: async (ctx, args) => {
     const me = await requireMember(ctx, args.memberToken);
-    if (!canEditTeamFlow(me)) throw new ConvexError("Only the team's owner can change the team flow.");
+    if (!canEditTeamFlow(me)) throw new ConvexError("Only the team's owners can change the team flow.");
     const row = await settingsRow(ctx, me.teamId);
     type Mapping = Doc<"teamFlowSettings">["channelRepos"][number];
     const mapping = (entry: {
@@ -185,6 +193,7 @@ export const set = mutation({
       qcOwnerSlackUserId:
         args.qcOwnerSlackUserId === undefined ? row?.qcOwnerSlackUserId : optionalText(args.qcOwnerSlackUserId),
       instructions: args.instructions === undefined ? row?.instructions : optionalText(args.instructions),
+      tracker: args.tracker === undefined ? row?.tracker : (args.tracker ?? undefined),
       updatedAt: Date.now(),
       updatedBy: me._id,
     };

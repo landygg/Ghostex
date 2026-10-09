@@ -47,21 +47,37 @@ pub(crate) fn link_submenu(id: &str, row: &SessionRow, group: &MenuGroup<'_>) ->
             .join(", ")
     });
 
+    let github_project = work.github_project.as_ref().map(|project| project.label());
+
     let pick = |label: &str, icon: &str, kind: &str, linked: &Option<String>| MenuItem {
         suffix: linked.clone(),
         ..MenuItem::row(label, icon, MenuCommand::link_work(id, kind))
     };
-    let mut children = vec![
-        pick(
-            "Pull request…",
-            "git-pull-request",
-            "pullRequest",
-            &pull_request,
-        ),
-        pick("Linear issue…", "hash", "linearIssue", &linear_issues),
-        pick("Linear project…", "box", "linearProject", &linear_project),
-        pick("GitHub issue…", "circle-dot", "githubIssue", &github_issues),
-    ];
+    // CDXC:WorkMode 2026-10-09 DECISION:
+    // User: Link to offers the primary tracker's tickets and projects ("Linear Tickets & Projects or Github Issues & Projects - Need to pick just 1"); links of the other kind that are already set can still be unlinked below.
+    let mut children = vec![pick(
+        "Pull request…",
+        "git-pull-request",
+        "pullRequest",
+        &pull_request,
+    )];
+    if project.work_github {
+        children.push(pick(
+            "GitHub issue…",
+            "circle-dot",
+            "githubIssue",
+            &github_issues,
+        ));
+        children.push(pick(
+            "GitHub project…",
+            "box",
+            "githubProject",
+            &github_project,
+        ));
+    } else {
+        children.push(pick("Linear issue…", "hash", "linearIssue", &linear_issues));
+        children.push(pick("Linear project…", "box", "linearProject", &linear_project));
+    }
 
     // Unlink writes "explicitly none" for that kind, so the branch cannot bring it back.
     let unlink_rows: Vec<MenuItem> = [
@@ -92,6 +108,11 @@ pub(crate) fn link_submenu(id: &str, row: &SessionRow, group: &MenuGroup<'_>) ->
                 "Unlink GitHub issue"
             },
             json!({ "githubIssues": [] }),
+        ),
+        (
+            github_project.is_some(),
+            "Unlink GitHub project",
+            json!({ "githubProject": "none" }),
         ),
     ]
     .into_iter()

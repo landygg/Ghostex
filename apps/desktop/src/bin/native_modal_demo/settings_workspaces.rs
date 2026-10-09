@@ -3,7 +3,9 @@
 //!
 //! States: `workspaces-team` (the Work workspace connected as the team's owner, Slack and the
 //! team's Linear key set), `workspaces-team-flow` (the same, opened at the Team flow section),
-//! `workspaces-join` (the Work workspace not connected yet). The Projects page's Work mode rows:
+//! `workspaces-join` (the Work workspace not connected yet), `workspaces-team-member` and
+//! `workspaces-team-member-flow` (connected as a member using their own Linear key: the team's key
+//! and the Team flow are read-only). The Projects page's Work mode rows:
 //! `projects-work-mode` (the Ghostex project in the Work workspace, using that workspace's Linear
 //! key) and `projects-work-mode-own` (the same project with its own key).
 use serde_json::{Value, json};
@@ -24,7 +26,7 @@ pub(super) fn open_message(state: &str) -> Option<Value> {
         _ if state.starts_with("projects-work-mode") => {
             json!({ "initialTab": "projects", "initialSection": "projectSettings" })
         }
-        "workspaces-team-flow" => {
+        "workspaces-team-flow" | "workspaces-team-member-flow" => {
             json!({ "initialTab": "workspaces", "initialSection": "workspace-work-team-flow" })
         }
         _ => json!({ "initialTab": "workspaces" }),
@@ -47,26 +49,40 @@ fn team_status(state: &str) -> Value {
     if state == "workspaces-join" {
         return json!({ "connections": [] });
     }
+    let member = is_member(state);
     json!({
         "connections": [{
             "workspaceId": "work",
             "deploymentUrl": "https://happy-otter-123.convex.cloud",
             "siteUrl": "https://happy-otter-123.convex.site",
             "teamName": "ShortPoint",
-            "memberName": "Yahia",
+            "memberName": if member { "Kevin" } else { "Yahia" },
+            "ownLinearKey": member,
             "subscription": "live",
             "team": {
-                "team": { "id": "t1", "name": "ShortPoint", "slackTeamId": "T04SHORTPT", "functionsVersion": 2 },
-                "deployedFunctionsVersion": 2,
-                "secrets": { "slackBotToken": true, "slackSigningSecret": true, "linearApiKey": false },
-                "me": { "id": "m1", "name": "Yahia", "role": "owner", "slackUserId": "U012ABCDEF", "linearUserId": null },
+                "team": { "id": "t1", "name": "ShortPoint", "slackTeamId": "T04SHORTPT", "functionsVersion": 4 },
+                "deployedFunctionsVersion": 4,
+                "secrets": { "slackBotToken": true, "slackSigningSecret": true, "linearApiKey": true },
+                "linearKeys": {
+                    "team": { "setByName": "Yahia", "linearUserName": "Yahia Mohamad", "updatedAt": 1760000000000_i64 },
+                    "mine": if member { json!({ "linearUserName": "Kevin", "updatedAt": 1760000000000_i64 }) } else { Value::Null }
+                },
+                "me": if member {
+                    json!({ "id": "m2", "name": "Kevin", "role": "member", "slackUserId": "UKEVIN", "linearUserId": "lin-kevin" })
+                } else {
+                    json!({ "id": "m1", "name": "Yahia", "role": "owner", "slackUserId": "U012ABCDEF", "linearUserId": "lin-yahia" })
+                },
                 "members": [{}, {}, {}, {}, {}, {}]
             }
         }]
     })
 }
 
-fn slack_flow() -> Value {
+fn is_member(state: &str) -> bool {
+    state.starts_with("workspaces-team-member")
+}
+
+fn slack_flow(state: &str) -> Value {
     json!({
         "workingChannelId": "C07KEVINBOT",
         "watchOnlyChannelIds": ["C05SPRINTVAL"],
@@ -80,13 +96,15 @@ fn slack_flow() -> Value {
         "qcOwnerSlackUserId": null,
         "instructions": "## Communication\n- During long tasks, post a short update as soon as each milestone lands.\n- Number report steps 1a, 1b, 2a…\n\n## Asking questions\n- Number the questions and letter the options; option A is always the recommended one.",
         "updatedAt": 1760000000000_i64,
-        "canEdit": true
+        "canEdit": !is_member(state)
     })
 }
 
-fn team_flow_steps() -> Value {
+fn team_flow_steps(state: &str) -> Value {
     json!({
-        "source": "builtIn",
+        "source": "team",
+        "team": true,
+        "canEdit": !is_member(state),
         "steps": [
             { "id": "ticket", "label": "Ticket", "rule": { "kind": "ticketExists" } },
             { "id": "working-thread", "label": "Working thread", "rule": { "kind": "slackWorkingThread" } },
@@ -135,9 +153,29 @@ pub(super) fn rpc(state: &str, path: &str, params: &Value) -> Option<Result<Valu
             "account": { "name": "Yahia", "organization": "ShortPoint" },
         }),
         "/api/agentAccounts" => json!({ "accounts": [] }),
+        // The Work workspace uses GitHub as its team's tracker, and `gh` cannot read GitHub
+        // Projects yet; Personal never picked one and has a Linear key.
+        "/api/readWorkTracker" if params.get("workspaceId").and_then(Value::as_str) == Some("work") => json!({
+            "workspaceId": "work",
+            "tracker": "github",
+            "source": "team",
+            "team": state != "workspaces-join",
+            "canEdit": !is_member(state),
+            "githubProjects": { "access": "missingScope", "command": "gh auth refresh -s read:project", "noticeDismissed": false }
+        }),
+        "/api/readWorkTracker" => json!({
+            "workspaceId": "personal",
+            "tracker": "linear",
+            "source": "default",
+            "team": false,
+            "canEdit": true,
+            "githubProjects": { "access": "unknown", "command": "gh auth refresh -s read:project", "noticeDismissed": false }
+        }),
+        "/api/setWorkTracker" => json!({ "workspaceId": params.get("workspaceId").cloned().unwrap_or(Value::Null), "tracker": params.get("tracker").cloned().unwrap_or(Value::Null) }),
         "/api/readTeamSyncStatus" => team_status(state),
-        "/api/readSlackFlowSettings" | "/api/setSlackFlowSettings" => slack_flow(),
-        "/api/readTeamFlow" | "/api/updateTeamFlow" => team_flow_steps(),
+        "/api/readSlackFlowSettings" | "/api/setSlackFlowSettings" => slack_flow(state),
+        "/api/readTeamFlow" | "/api/updateTeamFlow" => team_flow_steps(state),
+        "/api/setTeamLinearKey" | "/api/setOwnLinearKey" => json!({ "workspaceId": "work" }),
         "/api/joinTeamSync" => {
             return Some(Err(format!(
                 "This invite link was already used: {}",

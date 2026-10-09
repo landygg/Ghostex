@@ -3,7 +3,7 @@ import type { Doc } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
 
 /** Bumped when Ghostex needs a newer copy of these functions; `teams:info` reports it. */
-export const FUNCTIONS_VERSION = 3;
+export const FUNCTIONS_VERSION = 4;
 
 const INVITE_LIFETIME_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -46,6 +46,11 @@ export async function requireMember(ctx: QueryCtx, memberToken: string): Promise
     throw new ConvexError("This member token is not valid for this team. Join again with an invite link.");
   }
   return member;
+}
+
+/** Whether the member is one of the team's owners. */
+export function isOwner(member: Doc<"members">): boolean {
+  return member.role === "owner";
 }
 
 /** The ticket key as stored: trimmed, Linear identifiers upper-cased (`spx-12` → `SPX-12`). */

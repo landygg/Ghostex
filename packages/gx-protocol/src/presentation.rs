@@ -203,6 +203,11 @@ pub struct PresentationProject {
         skip_serializing_if = "is_false"
     )]
     pub work_linear: bool,
+    /// `linear` or `github`: the primary tracker of the project's workspace (server/src/work_mode/
+    /// tracker.rs), which decides what Create ticket makes and what Link to offers. Present only
+    /// with work mode on; absent from an older daemon (read as Linear).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub work_tracker: Option<String>,
     /// The workspace this project belongs to; absent = the default workspace (and on an older
     /// daemon). A worktree project follows its parent checkout's workspace.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -453,6 +458,10 @@ pub struct PresentationSessionWork {
     /// A Linear project is a release the team works on, never a repo.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub linear_project: Option<PresentationWorkLinearProject>,
+    /// A GitHub Project (Projects v2), published instead of `linear_project` when the workspace's
+    /// primary tracker is GitHub.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub github_project: Option<PresentationWorkGithubProject>,
     /// Some link was set by hand (`ghostex link-session`, the Link to menu), so "Back to
     /// automatic" has something to undo.
     #[serde(
@@ -478,6 +487,7 @@ impl PresentationSessionWork {
             || !self.linear_issues.is_empty()
             || !self.github_issues.is_empty()
             || self.linear_project.is_some()
+            || self.github_project.is_some()
     }
 }
 
@@ -532,6 +542,24 @@ pub struct PresentationWorkLinearProject {
     pub name: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
+}
+
+/// A GitHub Project (Projects v2): `owner/number` names it.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PresentationWorkGithubProject {
+    /// The user or organization login that owns it.
+    pub owner: String,
+    #[serde(deserialize_with = "crate::de::lenient_u64")]
+    pub number: u64,
+    /// Absent until `gh` answered (it needs the `read:project` scope).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
+    /// The item's Status field on the project board, e.g. "In progress".
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status: Option<String>,
 }
 
 /// One session row. Unique only together with `project_id`.

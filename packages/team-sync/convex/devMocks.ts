@@ -176,7 +176,9 @@ const linearMock = httpAction(async (ctx, request) => {
       : body.query.includes("projects(") || body.query.includes("project(")
         ? "projects"
         : "issue";
-  const count = await ctx.runMutation(internal.devMocks.record, { service: "linear", method: kind, body: JSON.stringify(body) });
+  // The key's last characters only, so a test can tell which key (the team's or a member's) made the call.
+  const keyTail = (request.headers.get("authorization") ?? "").slice(-6);
+  const count = await ctx.runMutation(internal.devMocks.record, { service: "linear", method: kind, body: JSON.stringify({ ...body, keyTail }) });
   if (kind === "teams") return json({ data: { teams: { nodes: MOCK_TEAMS } } });
   if (kind === "projects") {
     const vars = body.variables as { slug?: string; name?: string; id?: string };

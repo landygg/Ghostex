@@ -33,6 +33,11 @@ pub(crate) fn workspaces() -> Section {
                 "Work turns work mode on for the workspace's projects by default; Personal leaves it off.",
             ),
             row(
+                "workspaceTracker",
+                "Primary tracker",
+                "Linear tickets & projects, or GitHub issues & projects: what Create ticket, the Work view, Link to and Slack use. Shows the command that lets Ghostex read GitHub Projects when it can't yet.",
+            ),
+            row(
                 "workspaceLinearApiKey",
                 "Linear API key",
                 "The Linear key this workspace's projects use, unless a project sets its own.",
@@ -91,7 +96,12 @@ pub(crate) fn team() -> Section {
             row(
                 "teamLinearKey",
                 "Linear for the team",
-                "The team-wide Linear key Slack commands use to find and create tickets, set with ghostex team linear-connect.",
+                "The team-wide Linear key Slack commands use to find and create tickets. Only the team's owners set or remove it; tickets created with it show the key's owner as the creator in Linear.",
+            ),
+            row(
+                "teamOwnLinearKey",
+                "Create my Slack tickets with my own Linear key",
+                "Tickets you request from Slack are created with this workspace's Linear key, so Linear shows you as their creator.",
             ),
         ],
     )
@@ -137,7 +147,7 @@ pub(crate) fn team_flow() -> Section {
             row(
                 "teamFlowSteps",
                 "Team-flow steps",
-                "The steps each ticket shows on the Work page: reorder, rename, remove or add them, or reset to the default.",
+                "The steps each ticket shows on the Work page, shared by the whole team: reorder, rename, remove or add them, or reset to the default. Only the team's owners can change them.",
             ),
         ],
     )

@@ -4,10 +4,10 @@
 //! instructions every session started from Slack gets. "Never work without a ticket" is built in
 //! and shows as a locked switch. Reads `/api/readSlackFlowSettings`, writes `/api/setSlackFlowSettings`.
 //!
-//! CDXC:TeamSync 2026-10-09 WHY:
-//! Who may edit is decided by the team's Convex functions alone (`canEditTeamFlow` in
-//! packages/team-sync/convex/teamFlow.ts, reported here as `canEdit`), so making it owner-only is
-//! one line there and Settings, the CLI and every teammate follow it.
+//! CDXC:TeamSync 2026-10-09 DECISION:
+//! User: team flow settings are "Owners only". Who may edit is decided by the team's Convex
+//! functions alone (`canEditTeamFlow` in packages/team-sync/convex/teamFlow.ts, reported here as
+//! `canEdit`); members see the rows read-only with one line saying only owners can change them.
 use super::super::super::catalog::SettingOption;
 use super::super::super::fields::{
     ButtonVariant, RowSpec, setting_row, settings_button, settings_icon_button, settings_segmented,
@@ -176,7 +176,14 @@ impl WorkspacesTab {
         } else {
             let locked = saving || !can_edit;
             let reason = (!can_edit)
-                .then(|| SharedString::from("Only the team's owner can change the team flow."));
+                .then(|| SharedString::from("Only the team's owners can change the team flow."));
+            if !can_edit {
+                rows.push(owners_only_row(
+                    p,
+                    format!("team-flow-owners-{workspace_id}"),
+                    cx,
+                ));
+            }
             rows.push(self.channel_row(
                 p,
                 workspace_id,
@@ -661,4 +668,21 @@ impl WorkspacesTab {
             cx,
         )
     }
+}
+
+/// The one line members see above the team flow's read-only rows.
+pub(super) fn owners_only_row(
+    p: &SettingsPalette,
+    id: String,
+    cx: &mut Context<WorkspacesTab>,
+) -> AnyElement {
+    setting_row(
+        p,
+        id,
+        RowSpec::new("Only the team's owners can change the team flow")
+            .description("You see your team's flow as its owners set it."),
+        None,
+        div().into_any_element(),
+        cx,
+    )
 }

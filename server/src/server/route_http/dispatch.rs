@@ -307,6 +307,10 @@ pub(in crate::server) async fn route_http(
         Ok(response) => return response,
         Err(request) => request,
     };
+    let request = match route_work_tracker_http(request).await {
+        Ok(response) => return response,
+        Err(request) => request,
+    };
     let RouteHttpRequest {
         endpoint,
         request_id,

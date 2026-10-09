@@ -1,7 +1,8 @@
 //! A team's flow: the steps a ticket goes through (ticket, working thread, session, PR, review
 //! comments, CI, video, QC package, validation), each with the rule that says it is done. The
 //! steps are data stored per project or per workspace, with the user's team flow as the default,
-//! and the Work page's ticket details draw them as a tracker.
+//! and the Work page's ticket details draw them as a tracker. A workspace connected to a team uses
+//! the team's steps from its Convex project instead (crate::team_sync::read_team_flow_steps).
 //!
 //! CDXC:WorkMode 2026-10-09 DECISION:
 //! User: the team-flow steps on each ticket are editable in Team flow settings from the start, so
@@ -133,13 +134,25 @@ impl TeamFlowScope {
     }
 }
 
-/// The steps a project uses and where they came from: its own, its workspace's, the stored
-/// default, or the built-in default.
+/// The steps a project uses and where they came from: its team's (`team`, or `builtIn` while the
+/// team has none), else its own, its workspace's, the stored default, or the built-in default.
+/// A team that does not answer shows the built-in default as `teamError`.
 pub(crate) fn resolve_team_flow(
     paths: &GxserverPaths,
     project_id: Option<&str>,
     workspace_id: Option<&str>,
 ) -> (Value, &'static str) {
+    if let Some(team) =
+        workspace_id.and_then(|id| crate::team_sync::read_team_flow_steps(paths, id))
+    {
+        return match team {
+            Ok(crate::team_sync::TeamFlowSteps {
+                steps: Some(steps), ..
+            }) => (steps, "team"),
+            Ok(_) => (default_team_flow_steps(), "builtIn"),
+            Err(_) => (default_team_flow_steps(), "teamError"),
+        };
+    }
     let flows = read_flows(paths);
     let stored = |group: &str, id: &str| {
         flows

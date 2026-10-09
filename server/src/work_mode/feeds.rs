@@ -70,6 +70,34 @@ pub(crate) struct GithubListPullRequest {
     pub(crate) checks: Option<&'static str>,
     pub(crate) review_decision: Option<String>,
     pub(crate) body: String,
+    /// The first GitHub Project it is in (title, Status), when `gh` may read projects.
+    pub(crate) project: Option<GithubListProject>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct GithubListProject {
+    pub(crate) title: String,
+    pub(crate) status: Option<String>,
+}
+
+/// `projectItems` of `gh issue list` / `gh pr list` → the first project.
+fn first_project_item(value: &Value) -> Option<GithubListProject> {
+    value
+        .get("projectItems")
+        .and_then(Value::as_array)?
+        .iter()
+        .find_map(|item| {
+            let title = item.get("title").and_then(Value::as_str)?.trim();
+            (!title.is_empty()).then(|| GithubListProject {
+                title: title.to_string(),
+                status: item
+                    .pointer("/status/name")
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|name| !name.is_empty())
+                    .map(str::to_string),
+            })
+        })
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -81,6 +109,7 @@ pub(crate) struct GithubListIssue {
     pub(crate) assignees: Vec<String>,
     pub(crate) updated_at: Option<String>,
     pub(crate) labels: Vec<String>,
+    pub(crate) project: Option<GithubListProject>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -219,6 +248,10 @@ pub(crate) fn refresh_work_feeds(
     } else {
         Vec::new()
     };
+    // Whether the repo lists may ask for project items (`projectItems`).
+    if gh {
+        refresh_github_projects_access(force);
+    }
     let viewer_stale = gh
         && cache().lock().ok().is_some_and(|cache| {
             cache
@@ -409,6 +442,19 @@ pub(crate) fn pull_request_url_parts(url: &str) -> Option<(String, u64)> {
 
 fn fetch_github_feed(cwd: &str) -> Result<GithubFeed, String> {
     let repo = work_repo_of(cwd);
+    // `projectItems` makes `gh` fail outright without the `read:project` scope, so it is asked
+    // for only once `gh` is known to have it.
+    let projects = cached_github_projects_access() == GithubProjectsAccess::Granted;
+    let pull_request_fields = if projects {
+        "number,title,url,state,isDraft,author,assignees,updatedAt,headRefName,statusCheckRollup,reviewDecision,body,projectItems"
+    } else {
+        "number,title,url,state,isDraft,author,assignees,updatedAt,headRefName,statusCheckRollup,reviewDecision,body"
+    };
+    let issue_fields = if projects {
+        "number,title,url,author,assignees,updatedAt,labels,projectItems"
+    } else {
+        "number,title,url,author,assignees,updatedAt,labels"
+    };
     let pull_requests = run_gh_command(
         Some(cwd),
         &[
@@ -419,7 +465,7 @@ fn fetch_github_feed(cwd: &str) -> Result<GithubFeed, String> {
             "--limit",
             GITHUB_LIST_LIMIT,
             "--json",
-            "number,title,url,state,isDraft,author,assignees,updatedAt,headRefName,statusCheckRollup,reviewDecision,body",
+            pull_request_fields,
         ],
     )
     .ok_or_else(|| "gh could not list this repo's pull requests.".to_string())?;
@@ -441,7 +487,7 @@ fn fetch_github_feed(cwd: &str) -> Result<GithubFeed, String> {
             "--limit",
             GITHUB_LIST_LIMIT,
             "--json",
-            "number,title,url,author,assignees,updatedAt,labels",
+            issue_fields,
         ],
     )
     .and_then(|output| serde_json::from_str::<Value>(output.trim()).ok())
@@ -467,6 +513,7 @@ fn fetch_github_feed(cwd: &str) -> Result<GithubFeed, String> {
                 .and_then(Value::as_str)
                 .map(str::to_string),
             labels: names(issue.get("labels"), "name"),
+            project: first_project_item(issue),
         })
     })
     .collect();
@@ -521,6 +568,7 @@ fn parse_github_list_pull_request(value: &Value) -> Option<GithubListPullRequest
             .filter(|decision| !decision.is_empty())
             .map(str::to_string),
         body,
+        project: first_project_item(value),
     })
 }
 

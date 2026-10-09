@@ -3,6 +3,7 @@ import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { action, internalMutation, mutation } from "./_generated/server";
 import { inviteExpiry, newSecret, requireMember, sha256Hex } from "./lib/auth";
+import { removeMemberKey } from "./linearKeys";
 
 /**
  * Makes a one-time invite code. Ghostex wraps it in the invite link (`https://<deployment>.convex.site/join?code=…`).
@@ -85,11 +86,12 @@ export const consumeInvite = internalMutation({
   },
 });
 
-/** Removes the caller from the team; their token stops working. */
+/** Removes the caller from the team; their token stops working and their own Linear key is deleted. */
 export const leave = mutation({
   args: { memberToken: v.string() },
   handler: async (ctx, args) => {
     const me = await requireMember(ctx, args.memberToken);
+    await removeMemberKey(ctx, me);
     await ctx.db.patch(me._id, { removedAt: Date.now() });
     return null;
   },

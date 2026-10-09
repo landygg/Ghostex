@@ -1,11 +1,16 @@
 //! A Work workspace's team-flow steps: the steps the Work page draws as a tracker on each ticket
 //! (server/src/work_mode/team_flow.rs). Reorder, rename, remove, add a step with one of the rules
 //! the daemon knows, then Save; Reset to default drops the workspace's own steps. Reads
-//! `/api/readTeamFlow` and writes `/api/updateTeamFlow`, both scoped to the workspace.
+//! `/api/readTeamFlow` and writes `/api/updateTeamFlow`, both scoped to the workspace. In a
+//! workspace connected to a team these are the team's steps, kept in its Convex project.
 //!
 //! CDXC:WorkMode 2026-10-09 DECISION:
 //! User: the team-flow steps are editable in settings, with the user's own team flow as the
 //! default.
+//!
+//! CDXC:TeamSync 2026-10-09 DECISION:
+//! User: team flow settings are "Owners only". A team's steps are read-only for members
+//! (`canEdit` from the daemon), with one line saying only owners can change them.
 use super::super::super::catalog::SettingOption;
 use super::super::super::fields::{
     ButtonVariant, RowSpec, setting_row, settings_button, settings_icon_button, settings_select,
@@ -25,8 +30,12 @@ pub(crate) struct FlowStepsState {
     error: Option<String>,
     /// `{ id, label, rule }`, in order.
     steps: Vec<Value>,
-    /// Where the saved steps come from: `workspace`, `default` or `builtIn`.
+    /// Where the saved steps come from: `team`, `workspace`, `default`, `builtIn` or `teamError`.
     source: String,
+    /// The workspace is connected to a team, so these are the team's steps.
+    team: bool,
+    /// False for a team member who is not an owner.
+    can_edit: bool,
     /// `(kind, description, needsData)`.
     rules: Vec<(String, String, bool)>,
     dirty: bool,
@@ -58,6 +67,8 @@ impl FlowStepsState {
             .cloned()
             .unwrap_or_default();
         self.source = text(result, "source");
+        self.team = result.get("team").and_then(Value::as_bool) == Some(true);
+        self.can_edit = result.get("canEdit").and_then(Value::as_bool) != Some(false);
         self.rules = result
             .get("rules")
             .and_then(Value::as_array)
@@ -238,7 +249,7 @@ impl WorkspacesTab {
     ) -> Option<AnyElement> {
         self.ensure_flow_steps_loaded(workspace_id, cx);
         let mut rows: Vec<AnyElement> = Vec::new();
-        let (loaded, error, steps, dirty, saving, source) = {
+        let (loaded, error, steps, dirty, saving, source, team, can_edit) = {
             let state = self.flow_steps.entry(workspace_id.to_string()).or_default();
             (
                 state.loaded,
@@ -247,6 +258,8 @@ impl WorkspacesTab {
                 state.dirty,
                 state.saving,
                 state.source.clone(),
+                state.team,
+                state.can_edit,
             )
         };
         if !loaded {
@@ -267,13 +280,22 @@ impl WorkspacesTab {
                 div().into_any_element(),
                 cx,
             ));
+        } else if !can_edit {
+            rows.push(super::slack_flow::owners_only_row(
+                p,
+                format!("flow-steps-owners-{workspace_id}"),
+                cx,
+            ));
+            for (index, step) in steps.iter().enumerate() {
+                rows.push(self.read_only_flow_step_row(p, workspace_id, index, step, cx));
+            }
         } else {
             let count = steps.len();
             for (index, step) in steps.iter().enumerate() {
                 rows.push(self.flow_step_row(p, workspace_id, index, count, step, window, cx));
             }
             rows.push(self.add_flow_step_row(p, workspace_id, count, window, cx));
-            rows.push(self.flow_steps_footer(p, workspace_id, &source, dirty, saving, cx));
+            rows.push(self.flow_steps_footer(p, workspace_id, &source, team, dirty, saving, cx));
         }
         let title = if workspace_name.is_empty() {
             "Team-flow steps".to_string()
@@ -283,13 +305,63 @@ impl WorkspacesTab {
         settings_section(
             p,
             title,
-            Some(SharedString::from(
-                "The steps each ticket shows on the Work page, in order. A step whose data Ghostex can't see yet shows as unknown, never as done.",
-            )),
+            Some(SharedString::from(if team {
+                "The steps each ticket shows on the Work page, in order, shared by your whole team. A step whose data Ghostex can't see yet shows as unknown, never as done."
+            } else {
+                "The steps each ticket shows on the Work page, in order. A step whose data Ghostex can't see yet shows as unknown, never as done."
+            })),
             None,
             rows,
         )
         .map(IntoElement::into_any_element)
+    }
+
+    /// The rule a step uses, with the label or states it needs.
+    fn flow_step_detail(&self, workspace_id: &str, rule: &Value) -> String {
+        let kind = text(rule, "kind");
+        let mut detail = self
+            .flow_steps
+            .get(workspace_id)
+            .map(|state| state.rule_description(&kind))
+            .unwrap_or_else(|| kind.clone());
+        match kind.as_str() {
+            "pullRequestLabel" => detail.push_str(&format!(": {}", text(rule, "label"))),
+            "ticketState" => {
+                let states: Vec<&str> = rule
+                    .get("states")
+                    .and_then(Value::as_array)
+                    .into_iter()
+                    .flatten()
+                    .filter_map(Value::as_str)
+                    .collect();
+                detail.push_str(&format!(": {}", states.join(", ")));
+            }
+            _ => {}
+        }
+        detail
+    }
+
+    /// One of the team's steps as a member sees it: its name and its rule, nothing to change.
+    fn read_only_flow_step_row(
+        &mut self,
+        p: &SettingsPalette,
+        workspace_id: &str,
+        index: usize,
+        step: &Value,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        let rule = step.get("rule").cloned().unwrap_or_default();
+        let detail = self.flow_step_detail(workspace_id, &rule);
+        setting_row(
+            p,
+            format!("flow-step-read-{workspace_id}-{}", text(step, "id")),
+            RowSpec::new(format!("{}. {}", index + 1, text(step, "label")))
+                .readout(detail.clone())
+                .description(format!("Done when this rule holds: {detail}.")),
+            None,
+            div().into_any_element(),
+            cx,
+        )
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -307,30 +379,11 @@ impl WorkspacesTab {
         let label = text(step, "label");
         let rule = step.get("rule").cloned().unwrap_or_default();
         let kind = text(&rule, "kind");
-        let (description, needs_data) = {
-            let state = self.flow_steps.get(workspace_id);
-            (
-                state
-                    .map(|state| state.rule_description(&kind))
-                    .unwrap_or_else(|| kind.clone()),
-                state.is_some_and(|state| state.needs_data(&kind)),
-            )
-        };
-        let mut detail = description;
-        match kind.as_str() {
-            "pullRequestLabel" => detail.push_str(&format!(": {}", text(&rule, "label"))),
-            "ticketState" => {
-                let states: Vec<&str> = rule
-                    .get("states")
-                    .and_then(Value::as_array)
-                    .into_iter()
-                    .flatten()
-                    .filter_map(Value::as_str)
-                    .collect();
-                detail.push_str(&format!(": {}", states.join(", ")));
-            }
-            _ => {}
-        }
+        let needs_data = self
+            .flow_steps
+            .get(workspace_id)
+            .is_some_and(|state| state.needs_data(&kind));
+        let detail = self.flow_step_detail(workspace_id, &rule);
         let note = if needs_data {
             "Done when this rule holds. Shows as unknown until that data reaches Ghostex from Slack."
         } else {
@@ -551,6 +604,7 @@ impl WorkspacesTab {
         p: &SettingsPalette,
         workspace_id: &str,
         source: &str,
+        team: bool,
         dirty: bool,
         saving: bool,
         cx: &mut Context<Self>,
@@ -559,6 +613,7 @@ impl WorkspacesTab {
             "Unsaved changes"
         } else {
             match source {
+                "team" => "Your team's steps",
                 "workspace" => "This workspace's own steps",
                 "default" => "Default steps",
                 _ => "Built-in default",
@@ -568,8 +623,12 @@ impl WorkspacesTab {
             "Not saved yet."
         } else {
             match source {
+                "team" => "Your team uses its own steps, shared by every teammate.",
                 "workspace" => "This workspace uses its own steps.",
                 "default" => "This workspace uses the default steps saved on this computer.",
+                _ if team => {
+                    "Your team uses the default team flow. Saving makes these steps the whole team's."
+                }
                 _ => "This workspace uses the default team flow.",
             }
         };
@@ -598,26 +657,29 @@ impl WorkspacesTab {
                     cx,
                 ))
             })
-            .when(source == "workspace" && !dirty, |row| {
-                row.child(settings_button(
-                    p,
-                    SharedString::from(format!("flow-steps-reset-{workspace_id}")),
-                    "Reset to default",
-                    None,
-                    ButtonVariant::Outline,
-                    saving,
-                    None,
-                    move |page: &mut Self, _window, cx| {
-                        page.flow_steps_call(
-                            reset_workspace.clone(),
-                            "/api/updateTeamFlow",
-                            json!({ "reset": true }),
-                            cx,
-                        )
-                    },
-                    cx,
-                ))
-            })
+            .when(
+                (source == "workspace" || source == "team") && !dirty,
+                |row| {
+                    row.child(settings_button(
+                        p,
+                        SharedString::from(format!("flow-steps-reset-{workspace_id}")),
+                        "Reset to default",
+                        None,
+                        ButtonVariant::Outline,
+                        saving,
+                        None,
+                        move |page: &mut Self, _window, cx| {
+                            page.flow_steps_call(
+                                reset_workspace.clone(),
+                                "/api/updateTeamFlow",
+                                json!({ "reset": true }),
+                                cx,
+                            )
+                        },
+                        cx,
+                    ))
+                },
+            )
             .child(settings_button(
                 p,
                 SharedString::from(format!("flow-steps-save-{workspace_id}")),

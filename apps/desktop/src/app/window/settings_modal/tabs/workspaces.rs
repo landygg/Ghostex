@@ -17,6 +17,7 @@ mod drafts;
 mod flow_steps;
 mod slack_flow;
 mod team;
+mod tracker;
 
 use super::super::catalog::SettingOption;
 use super::super::fields::{
@@ -82,6 +83,8 @@ pub(crate) struct WorkspacesTab {
     team: HashMap<String, team::TeamConnectionState>,
     slack_flows: HashMap<String, slack_flow::SlackFlowState>,
     flow_steps: HashMap<String, flow_steps::FlowStepsState>,
+    /// Each workspace's primary tracker (Linear or GitHub).
+    trackers: HashMap<String, tracker::TrackerState>,
 }
 
 impl SettingsPage for WorkspacesTab {
@@ -118,6 +121,7 @@ impl WorkspacesTab {
             team: HashMap::new(),
             slack_flows: HashMap::new(),
             flow_steps: HashMap::new(),
+            trackers: HashMap::new(),
         }
     }
 
@@ -306,6 +310,8 @@ impl WorkspacesTab {
                             page.fields.texts.remove(&SharedString::from(format!(
                                 "workspace-linear-{workspace_id}"
                             )));
+                            // A workspace that never picked a tracker follows its Linear key.
+                            page.trackers.clear();
                         }
                         Err(error) => {
                             page.toast("error", "Couldn't save the Linear key", &error, cx)
@@ -320,6 +326,7 @@ impl WorkspacesTab {
 
     fn remove_linear_key(&mut self, workspace_id: String, cx: &mut Context<Self>) {
         self.key_accounts.remove(&workspace_id);
+        self.trackers.clear();
         self.write(
             "/api/setLinearApiKey",
             json!({ "workspaceId": workspace_id, "apiKey": "" }),
@@ -461,6 +468,9 @@ impl WorkspacesTab {
             ),
             cx,
         ));
+
+        // Primary tracker (and the GitHub Projects scope while `gh` lacks it).
+        rows.extend(self.tracker_rows(p, &workspace_id, cx));
 
         // Linear API key.
         rows.push(self.linear_key_row(p, &workspace_id, is_default, window, cx));

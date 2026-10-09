@@ -85,6 +85,8 @@ pub(crate) fn spawn_team_sync_task(state: &Arc<AppState>) -> JoinHandle<()> {
             if let Ok(mut statuses) = statuses().lock() {
                 statuses.clear();
             }
+            // At start and after a join or connect: the member's Linear user and own key.
+            super::linear_keys::spawn_member_linear_key_sync(&state, None);
             // Dropping the set at the next reload (or when this task is aborted) aborts them.
             let mut subscriptions = JoinSet::new();
             for connection in connections {

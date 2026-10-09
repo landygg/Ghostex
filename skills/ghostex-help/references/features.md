@@ -77,14 +77,18 @@ back. Closing the panel's last tab closes the whole panel; to bring the picker
 back instead, turn off **Close side panel with its last tab** in Settings >
 Sidebar with Show Advanced on (`closeSidePanelWithLastTab`, on by default).
 
-**Work** lists the tickets, GitHub issues and pull requests of every work-mode
-project in the window, Personal ones too (see Work mode under Git and
+**Work** lists the tickets and pull requests of every work-mode project in the
+window (Linear tickets or GitHub issues, whichever the workspace's primary
+tracker is), Personal ones too (see Work mode under Git and
 worktrees). Like work mode, it is part of Workspaces, which you turn on in
 Settings > Extensions (Features). Open it with the briefcase at the top of the sidebar, which shows
 while the window has a work-mode project, or from **Open a view**. It is one list,
 newest change first, and it opens with **Assigned to me** on; the filters next to
-it pick Linear issues, GitHub issues or PRs, the status, the repo, the Linear
-project, and **In my sidebar** (work one of your sessions is linked to). A PR that
+it pick the tickets or PRs, the status, the repo, the project (a Linear
+project, or a GitHub Project in a GitHub workspace), and **In my sidebar** (work
+one of your sessions is linked to). In a GitHub workspace where `gh` cannot read
+GitHub Projects yet, a notice shows the command to run (`gh auth refresh -s
+read:project`) with **Copy**; close it and it stays closed. A PR that
 belongs to a ticket shows on the ticket's row; a PR with no ticket gets its own
 row marked **No ticket**. A green dot means one of your sessions is working on it
 right now. Click a row, or a ticket or PR chip on a session card, to see its
@@ -108,11 +112,12 @@ change the steps, open Settings > Workspaces and use
 the workspace's **Team-flow steps**: reorder, rename or remove steps, add one with
 the rule that marks it done (for example "The pull request has a label" with
 `READY-FOR-QC`), then **Save steps**; **Reset to default** goes back to the
-default flow. **Open chat** shows the session linked to the ticket;
+default flow. In a workspace connected to a team the steps are the team's, shared
+by every teammate, and only the team's owners can change them. **Open chat** shows the session linked to the ticket;
 **Start chat** starts one in a new worktree on the ticket's branch, linked to it,
 and sends nothing; its arrow picks the agent and the project. **New ticket** at
-the top creates a Linear ticket (see Create Linear Ticket under Git and
-worktrees) and the list picks it up right away. The Work view is
+the top creates a Linear ticket or a GitHub issue (see Create Linear Ticket
+under Git and worktrees) and the list picks it up right away. The Work view is
 part of the desktop app; the web version opens a chip's link instead.
 
 Right-click a view tab to choose where that view appears and what happens to it.
@@ -386,10 +391,17 @@ in a window already showing that workspace or by switching the window to it.
 The Ghostex project that holds Help chats shows in every workspace. A Space you
 create joins the window's workspace too. A remote machine's tab shows in one
 workspace of this computer, Personal until you right-click the tab and choose
-Move to workspace; its projects keep that machine's own workspaces. Settings >
+Move to workspace; its projects keep that machine's own workspaces. On the
+phone, the Sessions list shows the same letter tile at the left of the Space
+row for each computer: tap it to choose which of that computer's workspaces the
+list shows. The phone remembers the choice, a session opened from a
+notification, the session search or Search Prompts switches the list to that
+session's workspace, and a project added from the phone joins the workspace it
+shows. Settings >
 Workspaces names each workspace, sets its color, makes it Work or Personal
-(Work turns work mode on by default for its projects), and sets its Linear API
-key and the Claude account its agents use (an account you pick when you start a
+(Work turns work mode on by default for its projects), picks its **Primary
+tracker** (Linear tickets & projects or GitHub issues & projects), and sets its
+Linear API key and the Claude account its agents use (an account you pick when you start a
 session still wins, and the agent launcher and New Thread picker mark the
 workspace's account as Default); Sign out of all sites clears that workspace's Browser sign-ins, and
 Delete moves its projects and Spaces to Personal. From the command line:
@@ -2235,13 +2247,26 @@ Pull request…, Linear issue…, Linear project… or GitHub issue…, and pick
 list (the session's own repo comes first; type to search, Enter links it). A
 session can link several Linear issues shipped in one PR; tick them in the list.
 Something already linked shows its ID in the menu, Unlink removes it, and Back to
-automatic lets the branch decide again. From a terminal, `ghostex link-session
+automatic lets the branch decide again. Each workspace picks one **Primary
+tracker** in Settings > Workspaces: Linear tickets & projects, or GitHub issues &
+projects (`ghostex work-mode tracker linear|github`; a workspace that never
+picked uses Linear when it has a Linear key, otherwise GitHub, and a team's
+owners pick it for the whole team). With GitHub, Link to offers GitHub issue…
+and GitHub project… instead of the Linear ones, and the card shows the GitHub
+Project the issue or PR is on (with its Status) instead of a Linear project;
+`ghostex link-session <session> --github-project <owner>/<number>` (or `none`)
+sets it by hand. Reading GitHub Projects needs one more `gh` permission: run
+`gh auth refresh -s read:project` (Settings > Workspaces shows it while it is
+missing). From a terminal, `ghostex link-session
 <session> --pr 6538 --linear SPX-1245 --issue 218` does the same and `--auto`
 goes back to what the branch says; `--candidates linearIssue --query text` (or
-`pullRequest`, `linearProject`, `githubIssue`) lists what the Link to list would
-suggest. The phone's session menu has the same Link to. When a linked PR is merged, its card offers
+`pullRequest`, `linearProject`, `githubIssue`, `githubProject`) lists what the Link
+to list would suggest. The phone's session menu has the same Link to. When a linked PR is merged, its card offers
 Clean up (remove the session's worktree and park the session; a worktree with
-uncommitted changes is kept) or Keep, once per PR. A
+uncommitted changes is kept) or Keep, once per PR; `ghostex work-mode cleanup
+<session> clean-up|keep` answers it from a terminal. The phone's session list
+shows the same second line: tap a chip to open it in the browser, touch and hold
+it to copy its link, and tap Clean up or Keep to answer. A
 session on a branch other than main is titled by that branch, without your name
 and the ticket ID, until you rename it. Linear status needs a Linear API key: set
 one per workspace in Settings > Workspaces; a project that needs a different key
@@ -2255,7 +2280,10 @@ with `gh auth login`. `ghostex work-mode status` says what is set up.
 
 To start a piece of work from a new ticket, open the project's "…" menu and choose
 Create Linear Ticket… (it shows once the project is in work mode and has a Linear
-key), or click **New ticket** at the top of the Work view, which opens the same
+key; in a workspace whose primary tracker is GitHub it is Create GitHub Issue…,
+which makes the issue in the project's repo and works on
+`<your GitHub name>/<number>-<title>`), or click **New ticket** at the top of the
+Work view, which opens the same
 dialog for the repo the list is filtered to and otherwise lets you pick the
 project. Give it a title and, if you like, a description, a team and a Linear
 project; it is assigned to you unless you turn that off. With Start work now on,
@@ -2267,7 +2295,7 @@ you type the first message. To start on a ticket that already exists, run
 which works on the PR's own branch and links the session to the PR and the issues
 it closes); a second session on the same ticket joins the first one's worktree and
 branch. `ghostex work-mode create-ticket --title "…"
---start` does both from a terminal. New session in a work-mode project still
+--start` does both from a terminal (a GitHub issue in a GitHub workspace). New session in a work-mode project still
 starts on main with no worktree.
 
 A Work workspace can share a team backend (part of Workspaces, so turn that on
@@ -2296,7 +2324,10 @@ cloud|local …` works at the top of a channel, where there is no thread to read
 Ghostex reads the whole thread, finds the Linear ticket (or GitHub issue or PR)
 it mentions, asks which one when there are several, and creates a Linear ticket
 from the thread when there is none, in the Linear project (release) the thread
-links or the channel is mapped to. A thread that names only a PR works on that
+links or the channel is mapped to. In a team whose primary tracker is GitHub it
+looks only for GitHub issue and PR links, and when there is none your Ghostex
+creates a GitHub issue in the channel's repo with `gh` (assigned to you) before
+it starts. A thread that names only a PR works on that
 PR's branch. Each ticket gets one working thread in the team's working channel,
 tagging only you and the dev/QC owner, whose first post lists the requirements
 your Ghostex summarised from the thread with a quick Claude call; and one working
@@ -2314,20 +2345,34 @@ post milestones with `ghostex slack post --session <session> "<text>"` (`--final
 for the result). Setup: create the Slack app from `ghostex team slack-manifest`
 (an app made from an older manifest needs the `channels:read` and `groups:read`
 scopes added and the app reinstalled before the Work view can show channel names),
-store its token and signing secret with `ghostex team slack-connect` and a Linear
-API key with `ghostex team linear-connect` (both read from stdin, on the computer
-that deployed the team), then set the flow with `ghostex team flow set
+store its token and signing secret with `ghostex team slack-connect` (read from
+stdin, on the computer that deployed the team), then set the flow with `ghostex team flow set
 --working-channel <channel ID> --watch-only <IDs> --default-run cloud|local
 --linear-team <KEY> --qc-owner <Slack member ID> --instructions-file <path>` and
 map each channel to its repo with `ghostex team flow map <channel ID> --repo
 owner/name` (add `--linear-project <name>` to put the tickets Ghostex creates from
 that channel into a Linear project). The team instructions file is added to every session started from
 Slack. Settings > Workspaces has all of this too: the **Slack** row's **Copy app
-manifest**, whether the bot token, signing secret and the team's Linear key are
-stored (with the `slack-connect` and `linear-connect` commands to copy), and the
-workspace's **Team flow** section for the working channel, watch-only channels,
-repos for new work, where new work runs, the default Linear team and the team
-instructions. **Never work without a ticket** is always on.
+manifest**, whether the bot token and signing secret are stored (with the
+`slack-connect` command to copy), and the workspace's **Team flow** section for the
+working channel, watch-only channels, repos for new work, where new work runs, the
+default Linear team and the team instructions. **Never work without a ticket** is
+always on. Only the team's owners can change the team flow; members see it
+read-only.
+
+Slack commands find and create Linear tickets with the team's Linear key. Only the
+team's owners set it: paste it in **Linear for the team** under the Work workspace
+in Settings > Workspaces (members see whether it is set and who set it), or run
+`ghostex team linear-connect` and paste it (`--remove` removes it). Tickets created
+with it show the key's owner as their creator in Linear. To be the creator of the
+tickets you request from Slack yourself, turn on **Create my Slack tickets with my
+own Linear key** (or `ghostex team own-linear-key on`): Ghostex stores the
+workspace's own Linear key (its **Linear API key** row) in the team's Convex project
+for you, keeps it up to date when you change that key, and removes it when you turn
+the switch off or leave the team; everything else still uses the team's key. The
+team's Convex admins can technically read stored keys. Ghostex also fills in your
+Linear user from your workspace's Linear key, so tickets created from your Slack
+requests are assigned to you.
 
 Related settings: Settings > Projects > Global Defaults (worktree command,
 docs directory), Settings > Projects > Work mode and Linear API key, `hideProjectHeaderDiffStats`,
@@ -2335,8 +2380,8 @@ docs directory), Settings > Projects > Work mode and Linear API key, `hideProjec
 `showUntrackedProjectDiffWhenNoTrackedChanges`. Work mode: `ghostex work-mode
 on|off|status|linear-key|create-ticket|start`, `ghostex link-session`. Team
 backend: `ghostex team deploy|join|invite|identity|status|ping|leave`. Slack:
-`ghostex team flow|slack-manifest|slack-connect|linear-connect`, `ghostex slack
-post`.
+`ghostex team flow|slack-manifest|slack-connect|linear-connect|own-linear-key`,
+`ghostex slack post`.
 
 ## Extensions, Open In, and integrations
 

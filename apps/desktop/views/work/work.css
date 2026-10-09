@@ -467,6 +467,44 @@ a:hover {
   color: var(--w-text);
 }
 
+.w-notice-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.w-notice code {
+  font-family: var(--w-mono);
+  font-size: 12px;
+  color: var(--w-text);
+}
+
+.w-notice-action,
+.w-notice-close {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  border: 0;
+  border-radius: 6px;
+  padding: 2px 6px;
+  background: transparent;
+  color: var(--w-text-2);
+  font: inherit;
+  cursor: pointer;
+}
+
+.w-notice-action:hover,
+.w-notice-close:hover {
+  background: var(--w-muted-bg);
+  color: var(--w-text);
+}
+
+.w-notice .w-notice-action svg,
+.w-notice .w-notice-close svg {
+  margin-top: 0;
+  color: inherit;
+}
+
 /* ---------- the list ---------- */
 .w-list-meta {
   display: flex;

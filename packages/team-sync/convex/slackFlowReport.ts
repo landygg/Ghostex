@@ -54,6 +54,17 @@ export const reportCommand = internalAction({
       runner?: string | null;
     };
 
+    if ((payload as { action?: string }).action === "createIssue") {
+      // A GitHub team's ticket, created by the requester's Ghostex: run the flow again with it.
+      const created = (command.result ?? {}) as { ticket?: string };
+      const requestId = (command.payload as { requestId?: string } | null)?.requestId;
+      if (command.status === "done" && created.ticket && requestId) {
+        await ctx.runMutation(internal.slackGithubIssue.continueWithIssue, { requestId, ticket: created.ticket });
+      } else if (command.status !== "cancelled") {
+        await note(`Couldn't create a GitHub issue for this: ${command.error ?? "it failed"}.`);
+      }
+      return null;
+    }
     if (payload.action === "message") {
       if (command.status === "failed") await note(`Couldn't send your message to ${ticket}'s session: ${command.error ?? "it failed"}.`);
       return null;

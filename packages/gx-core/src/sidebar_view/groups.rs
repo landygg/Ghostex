@@ -59,6 +59,7 @@ pub(crate) struct ProjectContextInput {
     pub(crate) bot_runs_today: u64,
     pub(crate) work_mode: bool,
     pub(crate) work_linear: bool,
+    pub(crate) work_github: bool,
 }
 
 /// Who is focused right now, in the vocabulary the rows compare against.
@@ -222,6 +223,7 @@ pub(crate) fn build_group(
             bot_gateway_running: project.bot_gateway_running,
             work_mode: project.work_mode,
             work_linear: project.work_linear,
+            work_github: project.work_github,
         }),
         summary,
         collapsed: ui.collapse.collapsed_groups.contains(&plan.group_id),

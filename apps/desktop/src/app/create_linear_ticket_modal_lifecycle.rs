@@ -70,10 +70,16 @@ impl GhostexGpuiApp {
                     app.gx_store_focus_created_session(&project_id, &session_id, false, None, cx);
                 }
                 CreateLinearTicketModalCommand::Created { identifier } => {
+                    // A GitHub issue is named `#218`, a Linear ticket by its ID.
+                    let where_it_is = if identifier.starts_with('#') {
+                        "The issue is on GitHub."
+                    } else {
+                        "The ticket is in Linear."
+                    };
                     app.dispatch_gpui_workspace_action_toast(
                         "success",
                         &format!("Created {identifier}"),
-                        "The ticket is in Linear.",
+                        where_it_is,
                         cx,
                     );
                 }

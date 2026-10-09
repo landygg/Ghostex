@@ -12,14 +12,14 @@ use crate::domain::{DomainRepository, DomainStateError};
 use crate::logging::{GxserverLogInput, LogLevel};
 use crate::storage::open_gxserver_database;
 use crate::work_mode::{
-    presentation_session_work, project_has_linear_key, project_work_mode, refresh_work_caches,
-    work_display_title,
+    cached_project_work_tracker, presentation_session_work, project_has_linear_key,
+    project_work_mode, refresh_work_caches, work_display_title, WorkTracker,
 };
 
-/// Which work-mode projects last published `workLinear`, so a pass republishes a project whose
-/// Linear key was set or removed.
-fn published_linear_projects() -> &'static Mutex<HashMap<String, bool>> {
-    static PUBLISHED: OnceLock<Mutex<HashMap<String, bool>>> = OnceLock::new();
+/// What each work-mode project last published as `workLinear` and `workTracker`, so a pass
+/// republishes a project whose Linear key was set or removed or whose tracker changed.
+fn published_linear_projects() -> &'static Mutex<HashMap<String, (bool, WorkTracker)>> {
+    static PUBLISHED: OnceLock<Mutex<HashMap<String, (bool, WorkTracker)>>> = OnceLock::new();
     PUBLISHED.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
@@ -71,7 +71,10 @@ pub(crate) fn run_work_mode_refresh_once(state: &Arc<AppState>) -> Result<(), Do
             let Some(project_id) = project.get("projectId").and_then(Value::as_str) else {
                 continue;
             };
-            let has_key = project_has_linear_key(project);
+            let has_key = (
+                project_has_linear_key(project),
+                cached_project_work_tracker(project_id),
+            );
             if published.insert(project_id.to_string(), has_key) != Some(has_key) {
                 linear_changed.push(project_id.to_string());
             }

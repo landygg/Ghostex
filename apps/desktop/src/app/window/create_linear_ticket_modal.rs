@@ -1,7 +1,13 @@
-//! Native GPUI Create Linear Ticket dialog: a work-mode project's "…" menu → Create Linear
-//! Ticket…, or the Work page's New ticket button (with a Project picker when the page shows several
-//! work-mode projects). It creates the ticket in Linear and, when Start work now is on, starts an agent on
-//! the ticket's branch in a new worktree, linked to the ticket.
+//! Native GPUI Create ticket dialog: a work-mode project's "…" menu → Create Linear Ticket… (or
+//! Create GitHub Issue…), or the Work page's New ticket button (with a Project picker when the page
+//! shows several work-mode projects). It creates the ticket in the workspace's primary tracker (a
+//! Linear ticket, or a GitHub issue in the project's repo) and, when Start work now is on, starts an
+//! agent on the ticket's branch in a new worktree, linked to the ticket.
+//!
+//! CDXC:WorkMode 2026-10-09 DECISION:
+//! User: the workspace's primary tracker is "Linear Tickets & Projects or Github Issues & Projects -
+//! Need to pick just 1". This one dialog follows it: for GitHub it has no Team or Linear project
+//! fields and makes a GitHub issue assigned to `@me` (server/src/work_mode/github_tickets.rs).
 //!
 //! CDXC:WorkMode 2026-10-09 WHY:
 //! The dialog stays open while Linear and gxserver work, so a refused key, a missing team or a
@@ -33,6 +39,7 @@ pub(crate) const CREATE_LINEAR_TICKET_MODAL_INITIAL_HEIGHT: f32 = 660.0;
 const START_WORK_TIMEOUT: Duration = Duration::from_secs(180);
 
 const TITLE: &str = "Create Linear Ticket";
+const GITHUB_TITLE: &str = "Create GitHub Issue";
 const TITLE_PLACEHOLDER: &str = "e.g. Add Copy link to the share menu";
 const DESCRIPTION_PLACEHOLDER: &str = "What needs doing (Markdown)";
 const NO_LINEAR_PROJECT: &str = "No Linear project";
@@ -68,6 +75,14 @@ pub(crate) struct CreateLinearTicketModalConfig {
 /// `(id, label)` of a team or a Linear project.
 type Choice = (String, String);
 
+/// Where the ticket goes: the project workspace's primary tracker (`/api/readWorkTracker`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Tracker {
+    Loading,
+    Linear,
+    Github,
+}
+
 pub(crate) struct GpuiCreateLinearTicketModalWindow {
     host: CreateLinearTicketModalHost,
     palette: ModalPalette,
@@ -75,6 +90,9 @@ pub(crate) struct GpuiCreateLinearTicketModalWindow {
     project_name: String,
     projects: Vec<Choice>,
     project_select: ModalSelect,
+    tracker: Tracker,
+    /// `owner/repo` the GitHub issue goes to, when known.
+    repo: Option<String>,
     title_input: Entity<InputState>,
     description_input: Entity<TextareaState>,
     title: String,
@@ -144,6 +162,8 @@ impl GpuiCreateLinearTicketModalWindow {
             project_name: config.project_name,
             projects: config.projects,
             project_select: ModalSelect::new(),
+            tracker: Tracker::Loading,
+            repo: None,
             title_input,
             description_input,
             title: String::new(),
@@ -167,8 +187,39 @@ impl GpuiCreateLinearTicketModalWindow {
             focus_handle: cx.focus_handle(),
             _subscriptions: subscriptions,
         };
-        this.load_teams(window, cx);
+        this.load_tracker(window, cx);
         this
+    }
+
+    /// Asks which tracker the project's workspace uses, then loads Linear's teams when it is Linear.
+    fn load_tracker(&self, window: &mut Window, cx: &mut Context<Self>) {
+        let project_id = self.project_id.clone();
+        let params = json!({ "projectId": project_id });
+        cx.spawn_in(window, async move |this, cx| {
+            let result = gx_rpc(None, "/api/readWorkTracker", params).await;
+            let _ = this.update_in(cx, |this, window, cx| {
+                if this.project_id != project_id {
+                    return;
+                }
+                match result {
+                    Ok(answer) if answer["tracker"].as_str() == Some("github") => {
+                        this.tracker = Tracker::Github;
+                        this.repo = answer["repo"].as_str().map(str::to_string);
+                        this.teams_loading = false;
+                    }
+                    Ok(_) => {
+                        this.tracker = Tracker::Linear;
+                        this.load_teams(window, cx);
+                    }
+                    Err(error) => {
+                        this.teams_loading = false;
+                        this.error = Some(error.message);
+                    }
+                }
+                cx.notify();
+            });
+        })
+        .detach();
     }
 
     fn load_teams(&self, window: &mut Window, cx: &mut Context<Self>) {
@@ -242,8 +293,11 @@ impl GpuiCreateLinearTicketModalWindow {
         self.busy.is_none()
             && (self.created.is_some()
                 || (!self.title.trim().is_empty()
-                    && !self.teams_loading
-                    && self.team_id().is_some()))
+                    && match self.tracker {
+                        Tracker::Loading => false,
+                        Tracker::Github => true,
+                        Tracker::Linear => !self.teams_loading && self.team_id().is_some(),
+                    }))
     }
 
     fn close_selects(&mut self) {
@@ -284,6 +338,20 @@ impl GpuiCreateLinearTicketModalWindow {
         });
         let start_work = self.start_work;
         let agent_id = self.agents.get(self.agent_index).map(|(id, _)| id.clone());
+        let github = self.tracker == Tracker::Github;
+        let (create_path, create_params) = if github {
+            (
+                "/api/createGithubIssue",
+                json!({
+                    "projectId": project_id,
+                    "title": self.title.trim(),
+                    "description": self.description.trim(),
+                    "assignToMe": self.assign_to_me,
+                }),
+            )
+        } else {
+            ("/api/createLinearIssue", create_params)
+        };
         self.busy = Some(if created.is_some() {
             "Starting work…"
         } else {
@@ -293,14 +361,19 @@ impl GpuiCreateLinearTicketModalWindow {
         cx.spawn_in(window, async move |this, cx| {
             let identifier = match created {
                 Some(identifier) => identifier,
-                None => match gx_rpc(None, "/api/createLinearIssue", create_params).await {
-                    Ok(ticket) => match ticket["identifier"].as_str() {
-                        Some(identifier) => identifier.to_string(),
+                None => match gx_rpc(None, create_path, create_params).await {
+                    // A GitHub issue is named `#218` from here on, a Linear ticket by its ID.
+                    Ok(ticket) => match ticket["identifier"]
+                        .as_str()
+                        .map(str::to_string)
+                        .or_else(|| ticket["number"].as_u64().map(|number| format!("#{number}")))
+                    {
+                        Some(identifier) => identifier,
                         None => {
                             let _ = this.update(cx, |this, cx| {
                                 this.busy = None;
                                 this.error =
-                                    Some("Linear did not say which ticket it created.".to_string());
+                                    Some("Ghostex was not told which ticket was created.".to_string());
                                 cx.notify();
                             });
                             return;
@@ -328,7 +401,10 @@ impl GpuiCreateLinearTicketModalWindow {
                 this.busy = Some("Starting work…");
                 cx.notify();
             });
-            let mut start_params = json!({ "projectId": project_id, "linearIssue": identifier });
+            let mut start_params = match identifier.strip_prefix('#') {
+                Some(number) => json!({ "projectId": project_id, "githubIssue": number }),
+                None => json!({ "projectId": project_id, "linearIssue": identifier }),
+            };
             if let Some(agent_id) = agent_id {
                 start_params["agentId"] = json!(agent_id);
             }
@@ -446,16 +522,19 @@ impl GpuiCreateLinearTicketModalWindow {
                 if let Some((project_id, name)) = self.projects.get(index).cloned()
                     && project_id != self.project_id
                 {
-                    // Teams and Linear projects come from the project's own Linear key.
+                    // The tracker, teams and Linear projects come from the project's own
+                    // workspace and Linear key.
                     self.project_id = project_id;
                     self.project_name = name;
+                    self.tracker = Tracker::Loading;
+                    self.repo = None;
                     self.teams.clear();
                     self.team_index = None;
                     self.teams_loading = true;
                     self.linear_projects.clear();
                     self.linear_project_index = None;
                     self.error = None;
-                    self.load_teams(window, cx);
+                    self.load_tracker(window, cx);
                 }
             }
             0 => {
@@ -598,14 +677,14 @@ impl GpuiCreateLinearTicketModalWindow {
                 cx,
             )));
         }
+        body = body.child(
+            v_flex()
+                .w_full()
+                .gap(px(8.0))
+                .child(modal_section_title(&p, "Title"))
+                .child(modal_text_input(&p, &self.title_input, busy, window, cx)),
+        );
         body = body
-            .child(
-                v_flex()
-                    .w_full()
-                    .gap(px(8.0))
-                    .child(modal_section_title(&p, "Title"))
-                    .child(modal_text_input(&p, &self.title_input, busy, window, cx)),
-            )
             .child(
                 v_flex()
                     .w_full()
@@ -621,8 +700,9 @@ impl GpuiCreateLinearTicketModalWindow {
                         window,
                         cx,
                     )),
-            )
-            .child(
+            );
+        if self.tracker != Tracker::Github {
+            body = body.child(
                 h_flex()
                     .w_full()
                     .gap(px(12.0))
@@ -648,7 +728,9 @@ impl GpuiCreateLinearTicketModalWindow {
                         1,
                         cx,
                     )),
-            )
+            );
+        }
+        body = body
             .child(self.switch_row(
                 "create-linear-ticket-assign",
                 "Assign to me",
@@ -800,12 +882,26 @@ fn choices(list: &Value, label: impl Fn(&Value) -> Option<String>) -> Vec<Choice
 impl Render for GpuiCreateLinearTicketModalWindow {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let p = self.palette;
-        let description = format!(
-            "A new Linear ticket for {}. Start work now opens an agent on the ticket's own branch.",
-            self.project_name
-        );
+        let (title, description) = match self.tracker {
+            Tracker::Github => (
+                GITHUB_TITLE,
+                format!(
+                    "A new GitHub issue in {}. Start work now opens an agent on the issue's own branch.",
+                    self.repo
+                        .clone()
+                        .unwrap_or_else(|| format!("{}'s repo", self.project_name))
+                ),
+            ),
+            _ => (
+                TITLE,
+                format!(
+                    "A new Linear ticket for {}. Start work now opens an agent on the ticket's own branch.",
+                    self.project_name
+                ),
+            ),
+        };
         let content = vec![
-            modal_header(&p, TITLE, Some(description)),
+            modal_header(&p, title, Some(description)),
             self.render_body(window, cx),
         ];
         let footer = self.render_footer(cx);

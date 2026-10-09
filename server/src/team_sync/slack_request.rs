@@ -25,7 +25,10 @@ use crate::session_chat_queue_runtime::{
     send_session_chat_message_internal, SessionChatMessageSource,
 };
 use crate::storage::open_gxserver_database;
-use crate::work_mode::{origin_repo, plan_pull_request, start_work_on_ticket, work_targets};
+use crate::work_mode::{
+    create_github_issue, origin_repo, plan_pull_request, start_work_on_ticket, work_targets,
+    NewGithubIssue,
+};
 use crate::workspaces::{project_workspace_id, read_sidebar_workspaces};
 use crate::worktree_sessions::read_worktree_session_marker;
 
@@ -67,6 +70,7 @@ pub(crate) fn run_slack_request(
     let result = match text(&payload, "/action") {
         Some("start") => start(state, connection, command_id, &payload),
         Some("message") => message(state, connection, command_id, &payload),
+        Some("createIssue") => create_issue(state, connection, &payload),
         other => Err(format!(
             "This Ghostex does not know the Slack action {}.",
             other.unwrap_or("(none)")
@@ -228,6 +232,35 @@ fn message(
         "delivered": true,
         "projectId": target.project_id,
         "sessionId": target.session_id,
+    }))
+}
+
+/// A GitHub team's Slack request with no GitHub issue in its thread: create the issue in the repo
+/// the channel maps to (`gh issue create`, assigned to this person), and report it as
+/// `owner/repo#number` so the Slack flow runs again with it (packages/team-sync/convex/
+/// slackGithubIssue.ts).
+fn create_issue(
+    state: &AppState,
+    connection: &TeamConnection,
+    payload: &Value,
+) -> Result<Value, String> {
+    let project = resolve_project(state, &connection.workspace_id, payload)?;
+    let cwd = text(&project, "/path").ok_or("The project for this channel has no folder.")?;
+    let created = create_github_issue(
+        cwd,
+        &NewGithubIssue {
+            title: text(payload, "/title").unwrap_or("Request from Slack"),
+            body: text(payload, "/body"),
+            assign_to_me: true,
+            repo: text(payload, "/repo/repo"),
+        },
+    )?;
+    Ok(json!({
+        "ticket": format!("{}#{}", created.repo, created.number),
+        "number": created.number,
+        "url": created.url,
+        "repo": created.repo,
+        "projectId": text(&project, "/projectId"),
     }))
 }
 

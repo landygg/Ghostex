@@ -743,6 +743,14 @@ pub fn endpoint_for(path: &str) -> Option<EndpointDescriptor> {
         never a key. Editing the team flow is a setting of this computer's.
         */
         "/api/listWorkItems" | "/api/readWorkItem" | "/api/readTeamFlow" => remote_allowed(path),
+        /*
+        CDXC:WorkMode 2026-10-09 WHY:
+        A remote sidebar creates a GitHub issue on the machine that owns the project, like a Linear
+        ticket, and closes the Work page's notice there. Reading and changing a workspace's tracker
+        is a setting of this computer's (a team workspace's choice goes through its member token).
+        */
+        "/api/createGithubIssue" | "/api/dismissWorkNotice" => remote_allowed(path),
+        "/api/readWorkTracker" | "/api/setWorkTracker" => full_local(path),
         "/api/updateTeamFlow" => full_local(path),
         /*
         CDXC:Workspaces 2026-10-09 WHY:
@@ -776,6 +784,8 @@ pub fn endpoint_for(path: &str) -> Option<EndpointDescriptor> {
         | "/api/pingTeamSync"
         | "/api/listTeamSyncCommands"
         | "/api/listTicketSlackThreads"
+        | "/api/setTeamLinearKey"
+        | "/api/setOwnLinearKey"
         | "/api/readSlackFlowSettings"
         | "/api/setSlackFlowSettings"
         | "/api/readSlackManifest"

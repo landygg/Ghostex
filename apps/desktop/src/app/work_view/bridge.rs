@@ -123,6 +123,18 @@ impl GhostexGpuiApp {
             }
             "work.startChat" => self.start_work_view_chat(request_id, &request, cx),
             // CDXC:WorkMode 2026-10-09 DECISION:
+            // User: the GitHub Projects scope notice is "a closable notice on the page that appears once"; closing it is remembered by gxserver, so it stays closed in every window.
+            "work.dismissNotice" => {
+                let params = json!({ "notice": text(&request, "notice").unwrap_or_default() });
+                self.work_view_rpc(
+                    request_id,
+                    "/api/dismissWorkNotice",
+                    params,
+                    WORK_LIST_TIMEOUT,
+                    cx,
+                );
+            }
+            // CDXC:WorkMode 2026-10-09 DECISION:
             // User: "We need a button to create a linear ticket to start work in the ... dropdown in the project header (also can be created from the 'Work' page)". New ticket opens the same native dialog, for the project the page is filtered to, or with the dialog's Project picker over the window's work-mode projects; the page refreshes when a ticket is made (`work_view_ticket_created`).
             "work.createTicket" => {
                 let projects = self.work_view_projects();

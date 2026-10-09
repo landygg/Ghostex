@@ -10554,6 +10554,17 @@
       "agentWritable": false
     },
     {
+      "key": "workspaceTracker",
+      "title": "Primary tracker",
+      "subtitle": "Linear tickets & projects, or GitHub issues & projects: what Create ticket, the Work view, Link to and Slack use. Shows the command that lets Ghostex read GitHub Projects when it can't yet.",
+      "tab": "workspaces",
+      "tabTitle": "Workspaces",
+      "section": "workspaces",
+      "sectionTitle": "Workspaces",
+      "type": "ui",
+      "agentWritable": false
+    },
+    {
       "key": "workspaceLinearApiKey",
       "title": "Linear API key",
       "subtitle": "The Linear key this workspace's projects use, unless a project sets its own.",
@@ -10655,7 +10666,18 @@
     {
       "key": "teamLinearKey",
       "title": "Linear for the team",
-      "subtitle": "The team-wide Linear key Slack commands use to find and create tickets, set with ghostex team linear-connect.",
+      "subtitle": "The team-wide Linear key Slack commands use to find and create tickets. Only the team's owners set or remove it; tickets created with it show the key's owner as the creator in Linear.",
+      "tab": "workspaces",
+      "tabTitle": "Workspaces",
+      "section": "team",
+      "sectionTitle": "Team",
+      "type": "ui",
+      "agentWritable": false
+    },
+    {
+      "key": "teamOwnLinearKey",
+      "title": "Create my Slack tickets with my own Linear key",
+      "subtitle": "Tickets you request from Slack are created with this workspace's Linear key, so Linear shows you as their creator.",
       "tab": "workspaces",
       "tabTitle": "Workspaces",
       "section": "team",
@@ -10732,7 +10754,7 @@
     {
       "key": "teamFlowSteps",
       "title": "Team-flow steps",
-      "subtitle": "The steps each ticket shows on the Work page: reorder, rename, remove or add them, or reset to the default.",
+      "subtitle": "The steps each ticket shows on the Work page, shared by the whole team: reorder, rename, remove or add them, or reset to the default. Only the team's owners can change them.",
       "tab": "workspaces",
       "tabTitle": "Workspaces",
       "section": "teamFlow",

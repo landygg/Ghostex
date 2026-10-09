@@ -21,6 +21,9 @@ pub(crate) struct WorkTargets {
     /// The branch's own PR from the git probe, which also carries its state.
     pub(crate) branch_pull_request: Option<u64>,
     pub(crate) linear_project: Option<Option<String>>,
+    /// A hand-set GitHub Project (`owner/number`); `None` = automatic, from the issues' and the
+    /// PR's project items.
+    pub(crate) github_project: Option<Option<String>>,
 }
 
 /// Resolves a work-mode session's links: hand-set ones first, then what its branch names, then
@@ -84,6 +87,7 @@ pub(crate) fn work_targets(project: &Value, session: &Value) -> WorkTargets {
         pull_request,
         branch_pull_request,
         linear_project: manual.linear_project,
+        github_project: manual.github_project,
     }
 }
 
@@ -168,7 +172,16 @@ pub(crate) fn presentation_session_work(project: &Value, session: &Value) -> Opt
         output.insert("githubIssues".to_string(), Value::Array(github_issues));
     }
 
+    // CDXC:WorkMode 2026-10-09 DECISION:
+    // User: the card shows the project kind of the workspace's primary tracker: a Linear project for Linear, a GitHub Project for GitHub (crate::work_mode::tracker).
+    let tracker = cached_project_work_tracker(
+        project
+            .get("projectId")
+            .and_then(Value::as_str)
+            .unwrap_or_default(),
+    );
     let linear_project = match &targets.linear_project {
+        _ if tracker != WorkTracker::Linear => None,
         Some(Some(name)) => Some(json!({ "name": name })),
         Some(None) => None,
         None => issues.iter().flatten().find_map(|issue| {
@@ -183,7 +196,68 @@ pub(crate) fn presentation_session_work(project: &Value, session: &Value) -> Opt
     if let Some(linear_project) = linear_project {
         output.insert("linearProject".to_string(), linear_project);
     }
+    if tracker == WorkTracker::Github {
+        if let Some(github_project) = session_github_project(&targets) {
+            output.insert(
+                "githubProject".to_string(),
+                presentation_github_project(&github_project),
+            );
+        }
+    }
     Some(Value::Object(output))
+}
+
+/// The GitHub Project a session links to: the hand-set one, else the first project item of its
+/// GitHub issues, then of its PR.
+pub(crate) fn session_github_project(targets: &WorkTargets) -> Option<GithubProjectInfo> {
+    match &targets.github_project {
+        Some(Some(reference)) => {
+            let (owner, number) = parse_github_project_reference(reference)?;
+            Some(
+                cached_github_project(&owner, number).unwrap_or(GithubProjectInfo {
+                    owner,
+                    number,
+                    title: None,
+                    url: None,
+                    status: None,
+                }),
+            )
+        }
+        Some(None) => None,
+        None => {
+            let cwd = targets.cwd.as_deref()?;
+            targets
+                .github_issues
+                .iter()
+                .copied()
+                .chain(
+                    targets
+                        .pull_request
+                        .as_deref()
+                        .and_then(pull_request_number_of),
+                )
+                .find_map(|number| cached_github_project_items(cwd, number).into_iter().next())
+        }
+    }
+}
+
+/// `123` or `https://github.com/o/r/pull/123` → 123.
+pub(crate) fn pull_request_number_of(selector: &str) -> Option<u64> {
+    let selector = selector.trim().trim_end_matches('/');
+    selector
+        .parse()
+        .ok()
+        .or_else(|| selector.rsplit_once("/pull/")?.1.parse().ok())
+}
+
+fn presentation_github_project(project: &GithubProjectInfo) -> Value {
+    let mut output = Map::new();
+    output.insert("owner".to_string(), json!(project.owner));
+    output.insert("number".to_string(), json!(project.number));
+    insert_text(&mut output, "title", project.title.as_deref());
+    insert_text(&mut output, "url", project.url.as_deref());
+    insert_text(&mut output, "status", project.status.as_deref());
+    Value::Object(output)
 }
 
 fn presentation_pull_request(targets: &WorkTargets) -> Option<Value> {

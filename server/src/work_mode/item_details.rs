@@ -389,12 +389,10 @@ pub(crate) fn read_work_item(
             .unwrap_or(0);
         facts.team = Some(team_ticket_facts(team));
     }
-    let workspace_id =
-        project.and_then(|input| crate::workspaces::stored_project_workspace_id(&input.project));
     let (steps, source) = resolve_team_flow(
         paths,
         project.map(|input| input.project_id.as_str()),
-        workspace_id,
+        project.map(|input| input.workspace_id.as_str()),
     );
 
     json!({

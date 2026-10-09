@@ -15,6 +15,8 @@ pub struct SessionWork {
     pub github_issues: Vec<WorkGithubIssue>,
     /// A release the team works on in Linear, never a repo.
     pub linear_project: Option<WorkLinearProject>,
+    /// A GitHub Project (Projects v2), when the workspace's primary tracker is GitHub.
+    pub github_project: Option<WorkGithubProject>,
     /// Some link was set by hand, so the Link to menu offers "Back to automatic".
     pub hand_set: bool,
     /// The linked PR is merged and the Clean up / Keep offer for it is unanswered.
@@ -58,6 +60,28 @@ pub struct WorkLinearProject {
     pub url: Option<String>,
 }
 
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct WorkGithubProject {
+    /// The login that owns it; `owner/number` names it.
+    pub owner: String,
+    pub number: u64,
+    /// Absent until `gh` could read it (it needs the `read:project` scope).
+    pub title: Option<String>,
+    pub url: Option<String>,
+    /// The item's Status on the project board.
+    pub status: Option<String>,
+}
+
+impl WorkGithubProject {
+    /// What a chip or a menu shows: the title, else `owner/number`.
+    pub fn label(&self) -> String {
+        self.title
+            .clone()
+            .filter(|title| !title.trim().is_empty())
+            .unwrap_or_else(|| format!("{}/{}", self.owner, self.number))
+    }
+}
+
 impl SessionWork {
     pub(crate) fn from_presentation(work: &PresentationSessionWork) -> Self {
         Self {
@@ -99,6 +123,16 @@ impl SessionWork {
                     name: project.name.clone(),
                     url: project.url.clone(),
                 }),
+            github_project: work
+                .github_project
+                .as_ref()
+                .map(|project| WorkGithubProject {
+                    owner: project.owner.clone(),
+                    number: project.number,
+                    title: project.title.clone(),
+                    url: project.url.clone(),
+                    status: project.status.clone(),
+                }),
             hand_set: work.hand_set,
             offer_cleanup: work.offer_cleanup,
         }
@@ -110,5 +144,6 @@ impl SessionWork {
             || !self.linear_issues.is_empty()
             || !self.github_issues.is_empty()
             || self.linear_project.is_some()
+            || self.github_project.is_some()
     }
 }

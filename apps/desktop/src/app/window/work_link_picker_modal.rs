@@ -44,6 +44,7 @@ pub(crate) enum WorkLinkKind {
     LinearIssue,
     LinearProject,
     GithubIssue,
+    GithubProject,
 }
 
 impl WorkLinkKind {
@@ -53,6 +54,7 @@ impl WorkLinkKind {
             "linearIssue" => Some(Self::LinearIssue),
             "linearProject" => Some(Self::LinearProject),
             "githubIssue" => Some(Self::GithubIssue),
+            "githubProject" => Some(Self::GithubProject),
             _ => None,
         }
     }
@@ -63,6 +65,7 @@ impl WorkLinkKind {
             Self::LinearIssue => "linearIssue",
             Self::LinearProject => "linearProject",
             Self::GithubIssue => "githubIssue",
+            Self::GithubProject => "githubProject",
         }
     }
 
@@ -72,6 +75,7 @@ impl WorkLinkKind {
             Self::LinearIssue => "a Linear issue",
             Self::LinearProject => "a Linear project",
             Self::GithubIssue => "a GitHub issue",
+            Self::GithubProject => "a GitHub project",
         }
     }
 
@@ -81,6 +85,7 @@ impl WorkLinkKind {
             Self::LinearIssue => "Search Linear issues, or type an ID like SPX-1245…",
             Self::LinearProject => "Search Linear projects…",
             Self::GithubIssue => "Search open GitHub issues…",
+            Self::GithubProject => "Search GitHub projects…",
         }
     }
 
@@ -97,6 +102,7 @@ impl WorkLinkKind {
             Self::GithubIssue => {
                 json!({ "githubIssues": values.first().into_iter().collect::<Vec<_>>() })
             }
+            Self::GithubProject => json!({ "githubProject": values.first() }),
         }
     }
 }
@@ -485,6 +491,8 @@ impl GpuiWorkLinkPickerModalWindow {
                 match (self.config.kind, row.own_repo) {
                     (WorkLinkKind::PullRequest, true) => "This session's branch",
                     (WorkLinkKind::PullRequest, false) => "Other open pull requests",
+                    (WorkLinkKind::GithubProject, true) => "The repo owner's projects",
+                    (WorkLinkKind::GithubProject, false) => "Your projects",
                     (_, true) => "From this repo",
                     (_, false) => "More",
                 }

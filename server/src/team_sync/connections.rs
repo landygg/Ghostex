@@ -30,6 +30,10 @@ pub(crate) struct TeamConnection {
     pub(crate) member_name: Option<String>,
     #[serde(default)]
     pub(crate) connected_at: Option<String>,
+    /// "Create my Slack tickets with my own Linear key": this workspace's Linear key is kept in the
+    /// team's Convex project for this member (crate::team_sync::linear_keys).
+    #[serde(default)]
+    pub(crate) own_linear_key: bool,
 }
 
 impl TeamConnection {
@@ -43,6 +47,7 @@ impl TeamConnection {
             "memberId": self.member_id,
             "memberName": self.member_name,
             "connectedAt": self.connected_at,
+            "ownLinearKey": self.own_linear_key,
         })
     }
 }

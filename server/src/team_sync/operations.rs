@@ -96,6 +96,7 @@ pub(crate) fn join_team(
             .map(str::to_string),
         member_name: Some(name),
         connected_at: Some(chrono::Utc::now().to_rfc3339()),
+        own_linear_key: false,
     };
     save_connection(paths, &connection)?;
     if let Some(slack_user_id) = text(params, "slackUserId") {
@@ -128,6 +129,7 @@ pub(crate) fn connect_team(
         member_id: None,
         member_name: None,
         connected_at: Some(chrono::Utc::now().to_rfc3339()),
+        own_linear_key: false,
     };
     let info = member_call(&connection, ConvexCallKind::Query, "teams:info", Map::new())?;
     connection.team_name = info

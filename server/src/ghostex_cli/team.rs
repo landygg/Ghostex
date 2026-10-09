@@ -14,7 +14,7 @@ use crate::team_sync::{deploy_team_functions, site_url, DeployOptions};
 
 const PING_WAIT: Duration = Duration::from_secs(20);
 
-/// `ghostex team join|status|deploy|invite|identity|threads|ping|leave|flow|slack-manifest|slack-connect|linear-connect …`.
+/// `ghostex team join|status|deploy|invite|identity|threads|ping|leave|flow|slack-manifest|slack-connect|linear-connect|own-linear-key …`.
 pub(super) fn team_command(args: &[String]) -> CliResult<()> {
     let parsed = parse_args(args);
     let flags = &parsed.flags;
@@ -76,8 +76,9 @@ pub(super) fn team_command(args: &[String]) -> CliResult<()> {
         "slack-manifest" => super::team_slack::slack_manifest_command(flags),
         "slack-connect" => super::team_slack::slack_connect_command(flags),
         "linear-connect" => super::team_slack::linear_connect_command(flags),
+        "own-linear-key" => super::team_slack::own_linear_key_command(&parsed.rest[1..], flags),
         other => Err(CliError::Other(format!(
-            "Unknown team command \"{other}\". Use join, status, deploy, invite, identity, threads, ping, leave, flow, slack-manifest, slack-connect or linear-connect."
+            "Unknown team command \"{other}\". Use join, status, deploy, invite, identity, threads, ping, leave, flow, slack-manifest, slack-connect, linear-connect or own-linear-key."
         ))),
     }
 }

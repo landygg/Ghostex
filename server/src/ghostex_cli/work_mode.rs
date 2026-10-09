@@ -43,6 +43,7 @@ pub(super) fn work_mode_command(args: &[String]) -> CliResult<()> {
             Ok(())
         }
         "create-ticket" => create_ticket(&parsed.rest[1..], flags),
+        "tracker" => tracker_command(parsed.rest.get(1).map(String::as_str), flags),
         "start" => {
             let ticket = parsed
                 .rest
@@ -61,14 +62,58 @@ pub(super) fn work_mode_command(args: &[String]) -> CliResult<()> {
             print_json(&result);
             Ok(())
         }
+        "cleanup" => answer_cleanup(&parsed.rest[1..], flags),
         other => Err(CliError::Other(format!(
-            "Unknown work-mode command \"{other}\". Use on, off, status, linear-key, create-ticket or start."
+            "Unknown work-mode command \"{other}\". Use on, off, status, linear-key, tracker, create-ticket, start or cleanup."
         ))),
     }
 }
 
+/// `ghostex work-mode tracker [linear|github] [--workspace W | --project-id id | --path p]`: the
+/// workspace's primary tracker (Linear tickets & projects, or GitHub issues & projects), or sets
+/// it. A team workspace's choice is the team's, which only its owners can change.
+fn tracker_command(value: Option<&str>, flags: &super::args::Flags) -> CliResult<()> {
+    let mut params = match flags.string_value("workspace") {
+        Some(workspace) => {
+            let mut params = Map::new();
+            params.insert("workspaceId".to_string(), json!(workspace));
+            params
+        }
+        None => project_selector(flags),
+    };
+    let current = rpc::call_gxserver_rpc(
+        "/api/readWorkTracker",
+        &Value::Object(params.clone()),
+        &with_default_timeout(flags, "30000"),
+    )?;
+    let Some(value) = value else {
+        print_json(&current);
+        return Ok(());
+    };
+    if !matches!(value, "linear" | "github") {
+        return Err(CliError::Other(
+            "Pass linear or github: ghostex work-mode tracker github".to_string(),
+        ));
+    }
+    params.clear();
+    params.insert(
+        "workspaceId".to_string(),
+        current.get("workspaceId").cloned().unwrap_or(Value::Null),
+    );
+    params.insert("tracker".to_string(), json!(value));
+    let result = rpc::call_gxserver_rpc(
+        "/api/setWorkTracker",
+        &Value::Object(params),
+        &with_default_timeout(flags, "30000"),
+    )?;
+    print_json(&result);
+    Ok(())
+}
+
 /// `ghostex work-mode create-ticket --title T [--description D] [--team-id id]
-/// [--linear-project-id id] [--no-assign] [--start [--agent id] [--model m] [--effort e]]`.
+/// [--linear-project-id id] [--no-assign] [--start [--agent id] [--model m] [--effort e]]`. In a
+/// workspace whose primary tracker is GitHub it creates a GitHub issue in the project's repo
+/// instead (the Linear flags are ignored).
 fn create_ticket(rest: &[String], flags: &super::args::Flags) -> CliResult<()> {
     let title = flags
         .string_value("title")
@@ -76,6 +121,36 @@ fn create_ticket(rest: &[String], flags: &super::args::Flags) -> CliResult<()> {
         .or_else(|| (!rest.is_empty()).then(|| rest.join(" ")))
         .ok_or_else(|| CliError::Other("Pass --title \"…\".".to_string()))?;
     let mut params = project_selector(flags);
+    let tracker = rpc::call_gxserver_rpc(
+        "/api/readWorkTracker",
+        &Value::Object(params.clone()),
+        &with_default_timeout(flags, "30000"),
+    )?;
+    if tracker.get("tracker").and_then(Value::as_str) == Some("github") {
+        params.insert("title".to_string(), json!(title));
+        if let Some(value) = flags.string_value("description") {
+            params.insert("description".to_string(), json!(value));
+        }
+        params.insert("assignToMe".to_string(), json!(!flags.truthy("noAssign")));
+        let created = rpc::call_gxserver_rpc(
+            "/api/createGithubIssue",
+            &Value::Object(params),
+            &with_default_timeout(flags, "60000"),
+        )?;
+        if !flags.truthy("start") {
+            print_json(&created);
+            return Ok(());
+        }
+        let number = created
+            .get("number")
+            .and_then(Value::as_u64)
+            .ok_or_else(|| {
+                CliError::Other("GitHub did not say which issue it created.".to_string())
+            })?;
+        let started = start_work(&number.to_string(), flags)?;
+        print_json(&json!({ "ticket": created, "started": started }));
+        return Ok(());
+    }
     params.insert("title".to_string(), json!(title));
     for (flag, key) in [
         ("description", "description"),
@@ -138,6 +213,47 @@ fn start_work(ticket: &str, flags: &super::args::Flags) -> CliResult<Value> {
     )
 }
 
+/// `ghostex work-mode cleanup <session> clean-up|keep`: answers the Clean up / Keep offer a
+/// session gets when its linked PR is merged, as the card's chips do (`/api/answerWorkCleanup`).
+fn answer_cleanup(rest: &[String], flags: &super::args::Flags) -> CliResult<()> {
+    let (selector, answer) = match rest {
+        [answer] => (None, answer),
+        [selector, answer] => (Some(selector), answer),
+        _ => {
+            return Err(CliError::Other(
+                "Pass the session and the answer: ghostex work-mode cleanup <session> clean-up|keep."
+                    .to_string(),
+            ))
+        }
+    };
+    let answer = match answer.trim().to_ascii_lowercase().as_str() {
+        "clean-up" | "cleanup" => "cleanUp",
+        "keep" => "keep",
+        _ => return Err(CliError::Other("The answer is clean-up or keep.".to_string())),
+    };
+    let mut payload = Map::new();
+    if let Some(selector) = flags
+        .string_value("sessionId")
+        .map(str::to_string)
+        .or_else(|| selector.cloned())
+    {
+        payload.insert("sessionId".to_string(), json!(selector));
+    }
+    let mut params = with_resolved_gxserver_session_params(&Value::Object(payload), flags)?
+        .as_object()
+        .cloned()
+        .unwrap_or_default();
+    params.insert("answer".to_string(), json!(answer));
+    // Cleaning up removes the session's worktree, which can outlast the CLI's 15s default.
+    let result = rpc::call_gxserver_rpc(
+        "/api/answerWorkCleanup",
+        &Value::Object(params),
+        &with_default_timeout(flags, "60000"),
+    )?;
+    print_json(&result);
+    Ok(())
+}
+
 /// Linear calls take a few seconds, and starting work fetches the branch, cuts the worktree, runs
 /// the project's setup command and starts the agent: longer than the CLI's 15s default.
 fn with_default_timeout(flags: &super::args::Flags, timeout_ms: &str) -> super::args::Flags {
@@ -149,9 +265,10 @@ fn with_default_timeout(flags: &super::args::Flags, timeout_ms: &str) -> super::
 }
 
 /// `ghostex link-session <selector> [--pr N|URL|none] [--linear SPX-1,SPX-2|none]
-/// [--issue N|none] [--linear-project NAME|none] [--auto]`, or
-/// `ghostex link-session <selector> --candidates pullRequest|linearIssue|linearProject|githubIssue
-/// [--query text]` to list what the Link to picker suggests.
+/// [--issue N|none] [--linear-project NAME|none] [--github-project OWNER/NUMBER|none] [--auto]`, or
+/// `ghostex link-session <selector> --candidates
+/// pullRequest|linearIssue|linearProject|githubIssue|githubProject [--query text]` to list what the
+/// Link to picker suggests.
 pub(super) fn link_session_command(args: &[String]) -> CliResult<()> {
     let parsed = parse_args(args);
     let flags = &parsed.flags;
@@ -189,6 +306,7 @@ pub(super) fn link_session_command(args: &[String]) -> CliResult<()> {
         ("linear", "linearIssues"),
         ("issue", "githubIssues"),
         ("linearProject", "linearProject"),
+        ("githubProject", "githubProject"),
     ] {
         if let Some(value) = flags.string_value(flag) {
             // `none` unlinks. The other kinds read it themselves; a Linear project is a name, so
@@ -207,12 +325,13 @@ pub(super) fn link_session_command(args: &[String]) -> CliResult<()> {
             "linearIssues",
             "githubIssues",
             "linearProject",
+            "githubProject",
         ]
         .iter()
         .any(|key| params.contains_key(*key))
     {
         return Err(CliError::Other(
-            "Pass --pr, --linear, --issue, --linear-project or --auto.".to_string(),
+            "Pass --pr, --linear, --issue, --linear-project, --github-project or --auto.".to_string(),
         ));
     }
     let result = rpc::call_gxserver_rpc("/api/setSessionWorkLinks", &Value::Object(params), flags)?;

@@ -195,11 +195,104 @@ const LIST: WorkList = {
   ],
   viewer: { githubLogin: "yahia" },
   linearConfigured: true,
+  tracker: "linear",
   ghAvailable: true,
   errors: [],
   generatedAt: new Date().toISOString(),
   refreshing: false,
 };
+
+/** A GitHub workspace (`?fixtures=1&tracker=github`): GitHub issues with their GitHub Project. */
+const GITHUB_ITEMS: WorkItem[] = [
+  {
+    ...base,
+    key: "issue:acme/web#218",
+    kind: "githubIssue",
+    id: "#218",
+    title: "Arabic plan cards overflow on narrow screens",
+    updatedAt: minutesAgo(2),
+    status: { group: "progress", name: "In progress" },
+    projectId: "p-web",
+    projectName: "web",
+    githubProject: { name: "Q4 Launch" },
+    assignee: { name: "yahia", isMe: true },
+    assignedToMe: true,
+    pullRequest: { number: 231, state: "open", checks: "passing" },
+    githubIssue: 218,
+    sessions: [session("arabic-plan-cards", true)],
+  },
+  {
+    ...base,
+    key: "issue:acme/web#224",
+    kind: "githubIssue",
+    id: "#224",
+    title: "Copy link in the share menu",
+    updatedAt: minutesAgo(40),
+    status: { group: "todo", name: "Todo" },
+    projectId: "p-web",
+    projectName: "web",
+    githubProject: { name: "Q4 Launch" },
+    assignee: { name: "yahia", isMe: true },
+    assignedToMe: true,
+    githubIssue: 224,
+  },
+  {
+    ...base,
+    key: "issue:acme/api#88",
+    kind: "githubIssue",
+    id: "#88",
+    title: "Rate-limit the export endpoint",
+    updatedAt: minutesAgo(180),
+    status: { group: "review", name: "In review" },
+    projectId: "p-api",
+    projectName: "api",
+    githubProject: { name: "Platform" },
+    assignee: { name: "yahia", isMe: true },
+    assignedToMe: true,
+    githubIssue: 88,
+  },
+  {
+    ...base,
+    key: "pr:acme/api#91",
+    kind: "pullRequest",
+    id: "#91",
+    title: "Bump the SDK",
+    updatedAt: minutesAgo(300),
+    status: { group: "open", name: "Open" },
+    projectId: "p-api",
+    projectName: "api",
+    assignee: { name: "yahia", isMe: true },
+    assignedToMe: true,
+    pullRequest: { number: 91, state: "open", checks: "pending" },
+    noTicket: true,
+    pullRequestRef: "91",
+  },
+];
+
+const GITHUB_LIST: WorkList = {
+  items: GITHUB_ITEMS,
+  projects: [
+    { projectId: "p-web", name: "web", repo: "acme/web" },
+    { projectId: "p-api", name: "api", repo: "acme/api" },
+  ],
+  viewer: { githubLogin: "yahia" },
+  linearConfigured: true,
+  tracker: "github",
+  githubProjects: {
+    access: "missingScope",
+    command: "gh auth refresh -s read:project",
+    noticeDismissed: false,
+  },
+  ghAvailable: true,
+  errors: [],
+  generatedAt: new Date().toISOString(),
+  refreshing: false,
+};
+
+const fixtureTracker = () =>
+  new URLSearchParams(location.search).get("tracker") === "github"
+    ? "github"
+    : "linear";
 
 const READY: WorkReady = {
   projectIds: ["p-shortpoint", "p-website"],
@@ -615,10 +708,13 @@ export async function answerFromFixtures(
     case "work.ready":
       return READY;
     case "work.list":
-      return { ...LIST, generatedAt: new Date().toISOString() };
+      return {
+        ...(fixtureTracker() === "github" ? GITHUB_LIST : LIST),
+        generatedAt: new Date().toISOString(),
+      };
     case "work.read": {
       const item =
-        ITEMS.find(
+        [...ITEMS, ...GITHUB_ITEMS].find(
           (candidate) =>
             (params.linearIssue &&
               candidate.linearIssue === params.linearIssue) ||

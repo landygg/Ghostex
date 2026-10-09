@@ -204,6 +204,12 @@ export function TicketDetailsView({
                 {item.linearProject.name}
               </span>
             ) : null}
+            {item.githubProject ? (
+              <span className="w-meta-chip">
+                <IconBox size={13} />
+                {item.githubProject.name}
+              </span>
+            ) : null}
             {item.cycle ? (
               <span className="w-meta-chip">{item.cycle}</span>
             ) : null}

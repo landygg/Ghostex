@@ -168,8 +168,52 @@ export default defineSchema({
     /** Tagged with the requester on every new working thread. */
     qcOwnerSlackUserId: v.optional(v.string()),
     instructions: v.optional(v.string()),
+    /** The team's primary tracker (Linear tickets & projects, or GitHub issues & projects); absent = Linear when the team has a Linear key, otherwise GitHub. */
+    tracker: v.optional(v.union(v.literal("linear"), v.literal("github"))),
     updatedAt: v.number(),
     updatedBy: v.optional(v.id("members")),
+  }).index("by_team", ["teamId"]),
+
+  /**
+   * The Linear API keys the Slack flow reads and creates tickets with: the team's key (no `memberId`) and at most one key per member. Only internal functions read `key`; every query, mutation and action answers with whether a key is set, never with the key.
+   *
+   * CDXC:TeamSync 2026-10-09 DECISION:
+   * User: "let's just use 1 key from the owner but also allow the user to override by setting their own key". The team key is set by an owner; a member who turns on "Create my Slack tickets with my own Linear key" has their workspace's Linear key stored here, and tickets they request from Slack are created with it so Linear shows them as the creator.
+   *
+   * CDXC:TeamSync 2026-10-09 WHY:
+   * Convex has no per-row secrecy from the deployment's admins, so the team's Convex admins can technically read these keys; Settings says so next to the switch.
+   */
+  linearKeys: defineTable({
+    teamId: v.id("teams"),
+    /** Absent for the team's key. */
+    memberId: v.optional(v.id("members")),
+    key: v.string(),
+    /** Whose Linear account the key acts as, as Linear named it when it was saved. */
+    linearUserName: v.optional(v.string()),
+    setBy: v.id("members"),
+    updatedAt: v.number(),
+  }).index("by_team_member", ["teamId", "memberId"]),
+
+  /**
+   * The team's flow steps (one row per team): the steps the Work page draws as a tracker on each ticket. A team without a row uses Ghostex's default flow.
+   *
+   * SEE-ALSO: server/src/work_mode/team_flow.rs (the rules, the default steps and the same validation), teamFlowSteps.ts.
+   */
+  teamFlowSteps: defineTable({
+    teamId: v.id("teams"),
+    steps: v.array(
+      v.object({
+        id: v.string(),
+        label: v.string(),
+        rule: v.object({
+          kind: v.string(),
+          label: v.optional(v.string()),
+          states: v.optional(v.array(v.string())),
+        }),
+      }),
+    ),
+    updatedAt: v.number(),
+    updatedBy: v.id("members"),
   }).index("by_team", ["teamId"]),
 
   /** One `@Ghostex` mention or `/ghostex` command, from receipt until its work is queued. */

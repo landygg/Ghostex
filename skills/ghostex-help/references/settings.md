@@ -531,6 +531,7 @@ How to use this file:
 - **Workspace name** `workspaceName` (Settings UI row without a settings key; use `ghostex settings open`): The name and letter shown on the workspace button left of your Spaces.
 - **Workspace color** `workspaceColor` (Settings UI row without a settings key; use `ghostex settings open`): The color of the workspace button.
 - **Work or Personal** `workspaceKind` (Settings UI row without a settings key; use `ghostex settings open`): Work turns work mode on for the workspace's projects by default; Personal leaves it off.
+- **Primary tracker** `workspaceTracker` (Settings UI row without a settings key; use `ghostex settings open`): Linear tickets & projects, or GitHub issues & projects: what Create ticket, the Work view, Link to and Slack use. Shows the command that lets Ghostex read GitHub Projects when it can't yet.
 - **Linear API key** `workspaceLinearApiKey` (Settings UI row without a settings key; use `ghostex settings open`): The Linear key this workspace's projects use, unless a project sets its own.
 - **Claude account** `workspaceClaudeAccount` (Settings UI row without a settings key; use `ghostex settings open`): Which of your Claude accounts agents in this workspace's projects use.
 - **Browser sign-ins** `workspaceBrowserSignins` (Settings UI row without a settings key; use `ghostex settings open`): Each workspace's Browser keeps its own cookies; sign out of every site here.
@@ -542,7 +543,8 @@ How to use this file:
 - **Slack app manifest** `slackAppManifest` (Settings UI row without a settings key; use `ghostex settings open`): Copy the manifest that creates your team's Slack app.
 - **Slack bot token and signing secret** `slackSecrets` (Settings UI row without a settings key; use `ghostex settings open`): Stored in your team's Convex project with ghostex team slack-connect.
 - **Your Slack user** `slackUser` (Settings UI row without a settings key; use `ghostex settings open`): Your Slack member ID, so @Ghostex commands you send in Slack reach this computer.
-- **Linear for the team** `teamLinearKey` (Settings UI row without a settings key; use `ghostex settings open`): The team-wide Linear key Slack commands use to find and create tickets, set with ghostex team linear-connect.
+- **Linear for the team** `teamLinearKey` (Settings UI row without a settings key; use `ghostex settings open`): The team-wide Linear key Slack commands use to find and create tickets. Only the team's owners set or remove it; tickets created with it show the key's owner as the creator in Linear.
+- **Create my Slack tickets with my own Linear key** `teamOwnLinearKey` (Settings UI row without a settings key; use `ghostex settings open`): Tickets you request from Slack are created with this workspace's Linear key, so Linear shows you as their creator.
 ### Team flow
 
 - **Working channel** `teamWorkingChannel` (Settings UI row without a settings key; use `ghostex settings open`): The Slack channel where each ticket gets its one working thread.
@@ -551,7 +553,7 @@ How to use this file:
 - **Where new work runs** `teamDefaultRunPlace` (Settings UI row without a settings key; use `ghostex settings open`): Cloud or this computer, for @Ghostex in Slack without cloud or local.
 - **Never work without a ticket** `teamNeverWithoutTicket` (Settings UI row without a settings key; use `ghostex settings open`): Ghostex finds the ticket in the thread or creates one in Linear before any session starts. Always on.
 - **Team instructions** `teamInstructions` (Settings UI row without a settings key; use `ghostex settings open`): Your team's rules, added to every session Ghostex starts from Slack.
-- **Team-flow steps** `teamFlowSteps` (Settings UI row without a settings key; use `ghostex settings open`): The steps each ticket shows on the Work page: reorder, rename, remove or add them, or reset to the default.
+- **Team-flow steps** `teamFlowSteps` (Settings UI row without a settings key; use `ghostex settings open`): The steps each ticket shows on the Work page, shared by the whole team: reorder, rename, remove or add them, or reset to the default. Only the team's owners can change them.
 ## Hotkeys (tab `hotkeys`)
 
 ### Projects

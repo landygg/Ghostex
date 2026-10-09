@@ -199,12 +199,21 @@ pub fn project_header_menu_rows(
     );
     // CDXC:WorkMode 2026-10-09 DECISION:
     // User: "We need a button to create a linear ticket to start work in the ... dropdown in the project header" (also from the Work page). Only a work-mode project of this computer with a Linear key has it; New session itself stays on main with no worktree.
-    if project.work_linear && !group.is_remote && !group.is_stale {
+    // CDXC:WorkMode 2026-10-09 DECISION:
+    // User: the workspace's primary tracker is "Linear Tickets & Projects or Github Issues & Projects"; with GitHub the same item and dialog create a GitHub issue in the project's repo instead.
+    let create_ticket = if project.work_github {
+        Some(("Create GitHub Issue…", "brand-github"))
+    } else if project.work_linear {
+        Some(("Create Linear Ticket…", "brand-linear"))
+    } else {
+        None
+    };
+    if let Some((label, icon)) = create_ticket.filter(|_| !group.is_remote && !group.is_stale) {
         actions.insert(
             0,
             MenuItem::row(
-                "Create Linear Ticket…",
-                "brand-linear",
+                label,
+                icon,
                 MenuCommand::project_action(group_id, "createLinearTicket", None),
             ),
         );

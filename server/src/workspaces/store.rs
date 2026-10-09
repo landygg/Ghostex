@@ -203,7 +203,7 @@ pub(crate) fn create_workspace_in(
     let mut workspace = Map::new();
     workspace.insert("workspaceId".into(), json!(workspace_id));
     workspace.insert("name".into(), json!(name));
-    for key in ["color", "letter", "kind", "claudeAccountId"] {
+    for key in ["color", "letter", "kind", "claudeAccountId", "tracker"] {
         if let Some(value) = params.get(key) {
             workspace.insert(key.into(), value.clone());
         }
@@ -226,8 +226,8 @@ pub(crate) fn create_workspace_in(
     Ok((workspace_id, normalize_sidebar_workspaces_state(&next)))
 }
 
-/// Applies `params` (`name`, `color`, `letter`, `kind`, `claudeAccountId`; `null` clears the
-/// account) to one workspace.
+/// Applies `params` (`name`, `color`, `letter`, `kind`, `claudeAccountId`, `tracker`; `null`
+/// clears the account or the tracker) to one workspace.
 pub(crate) fn update_workspace_in(
     state: &Value,
     workspace_id: &str,
@@ -239,7 +239,7 @@ pub(crate) fn update_workspace_in(
         .and_then(|workspaces| workspaces.get_mut(workspace_id))
         .and_then(Value::as_object_mut)
         .ok_or_else(|| DomainStateError::bad_request("No such workspace."))?;
-    for key in ["name", "color", "letter", "kind", "claudeAccountId"] {
+    for key in ["name", "color", "letter", "kind", "claudeAccountId", "tracker"] {
         match params.get(key) {
             Some(Value::Null) => {
                 workspace.remove(key);
@@ -351,6 +351,16 @@ pub fn normalize_sidebar_workspaces_state(state: &Value) -> Value {
         workspace.insert("kind".into(), json!(kind.as_wire()));
         if let Some(account_id) = bounded_text(source.get("claudeAccountId"), MAX_ID_CHARS) {
             workspace.insert("claudeAccountId".into(), json!(account_id));
+        }
+        // The primary tracker this computer picked (crate::work_mode::tracker); absent = never
+        // picked, which resolves to Linear when a Linear key applies and GitHub otherwise.
+        if let Some(tracker) = source
+            .get("tracker")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|tracker| matches!(*tracker, "linear" | "github"))
+        {
+            workspace.insert("tracker".into(), json!(tracker));
         }
         workspaces.insert(workspace_id.clone(), Value::Object(workspace));
     }

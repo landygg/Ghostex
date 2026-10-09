@@ -1,5 +1,5 @@
 //! The Slack side of `ghostex team` (`flow`, `slack-manifest`, `slack-connect`,
-//! `linear-connect`) and `ghostex slack post`, which agents started from Slack use to post to their
+//! `linear-connect`, `own-linear-key`) and `ghostex slack post`, which agents started from Slack use to post to their
 //! ticket's working thread.
 
 use std::io::{IsTerminal, Read};
@@ -172,28 +172,42 @@ pub(super) fn slack_connect_command(flags: &Flags) -> CliResult<()> {
     Ok(())
 }
 
-/// Reads a Linear API key from stdin and stores it as the team's `LINEAR_API_KEY`, which the Slack
-/// command flow uses to find and create tickets while the requester's computer is off.
+/// Reads a Linear API key from stdin and stores it as the team's Linear key, which the Slack
+/// command flow uses to find and create tickets while the requester's computer is off. Owners
+/// only (the team refuses anyone else); `--remove` removes it.
 pub(super) fn linear_connect_command(flags: &Flags) -> CliResult<()> {
-    let input = read_stdin(
-        "Paste a Linear API key (lin_api_…), then press Ctrl+D (Ctrl+Z, Enter on Windows):",
-    )?;
-    let key = input
-        .split_whitespace()
-        .find(|word| word.starts_with("lin_api_"))
-        .ok_or_else(|| {
-            CliError::Other("Pass a Linear API key (starts with lin_api_).".to_string())
-        })?;
-    let workspace_id = resolve_workspace_id(flags)?;
-    set_deployment_env(
-        &get_gxserver_paths(None),
-        &workspace_id,
-        flags.truthy("dev"),
-        &[("LINEAR_API_KEY", key)],
-    )
-    .map_err(CliError::Other)?;
-    print_json(&json!({ "ok": true, "workspaceId": workspace_id, "set": ["LINEAR_API_KEY"] }));
-    Ok(())
+    let mut params = workspace_params(flags)?;
+    if !flags.truthy("remove") {
+        let input = read_stdin(
+            "Paste a Linear API key (lin_api_…), then press Ctrl+D (Ctrl+Z, Enter on Windows):",
+        )?;
+        let key = input
+            .split_whitespace()
+            .find(|word| word.starts_with("lin_api_"))
+            .ok_or_else(|| {
+                CliError::Other("Pass a Linear API key (starts with lin_api_).".to_string())
+            })?;
+        params.insert("apiKey".to_string(), json!(key));
+    }
+    call_and_print("/api/setTeamLinearKey", params, flags)
+}
+
+/// `ghostex team own-linear-key on|off`: whether the Slack flow creates the tickets you request
+/// with this workspace's Linear key (stored in the team's Convex project for you) instead of the
+/// team's key.
+pub(super) fn own_linear_key_command(rest: &[String], flags: &Flags) -> CliResult<()> {
+    let enabled = match rest.first().map(String::as_str) {
+        Some("on") => true,
+        Some("off") => false,
+        _ => {
+            return Err(CliError::Other(
+                "Use: ghostex team own-linear-key on|off [--workspace name]".to_string(),
+            ))
+        }
+    };
+    let mut params = workspace_params(flags)?;
+    params.insert("enabled".to_string(), json!(enabled));
+    call_and_print("/api/setOwnLinearKey", params, flags)
 }
 
 /// `ghostex slack post [--session <ref>] "<text>" [--final]`. Without `--session`, the session

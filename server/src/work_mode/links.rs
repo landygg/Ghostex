@@ -9,6 +9,8 @@ use serde_json::{json, Map, Value};
 
 use crate::domain::DomainStateError;
 
+use super::parse_github_project_reference;
+
 /// A session's hand-set links. `None` = automatic, `Some(empty)` = explicitly none.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct ManualWorkLinks {
@@ -16,6 +18,8 @@ pub(crate) struct ManualWorkLinks {
     pub(crate) linear_issues: Option<Vec<String>>,
     pub(crate) github_issues: Option<Vec<u64>>,
     pub(crate) linear_project: Option<Option<String>>,
+    /// A GitHub Project as `owner/number`.
+    pub(crate) github_project: Option<Option<String>>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -58,6 +62,12 @@ pub(crate) fn manual_work_links(session: &Value) -> ManualWorkLinks {
                 .map(str::trim)
                 .filter(|name| !name.is_empty())
                 .map(str::to_string)
+        }),
+        github_project: links.get("githubProject").map(|value| {
+            value
+                .as_str()
+                .and_then(parse_github_project_reference)
+                .map(|(owner, number)| format!("{owner}/{number}"))
         }),
     }
 }
@@ -182,6 +192,33 @@ pub(crate) fn merge_work_links(
             }
             _ => {
                 links.insert("linearProject".to_string(), Value::Null);
+            }
+        }
+    }
+    // `owner/number` or the project's URL; `"none"` or `""` = explicitly none.
+    if let Some(value) = request.get("githubProject") {
+        match value {
+            Value::Null => {
+                links.remove("githubProject");
+            }
+            Value::String(text)
+                if text.trim().is_empty() || text.trim().eq_ignore_ascii_case("none") =>
+            {
+                links.insert("githubProject".to_string(), Value::Null);
+            }
+            other => {
+                let (owner, number) = other
+                    .as_str()
+                    .and_then(parse_github_project_reference)
+                    .ok_or_else(|| {
+                        DomainStateError::bad_request(
+                            "githubProject must be owner/number (like acme/12) or the project's link.",
+                        )
+                    })?;
+                links.insert(
+                    "githubProject".to_string(),
+                    json!(format!("{owner}/{number}")),
+                );
             }
         }
     }

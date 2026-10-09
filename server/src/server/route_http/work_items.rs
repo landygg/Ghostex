@@ -8,12 +8,13 @@ use serde_json::{json, Map, Value};
 use crate::domain::DomainStateError;
 use crate::protocol::rpc_success;
 use crate::team_sync::{
-    apply_team_ticket_summaries, refresh_team_ticket_summaries, team_tickets_by_workspace,
+    apply_team_ticket_summaries, read_team_flow_steps, refresh_team_ticket_summaries,
+    store_team_flow_steps, team_tickets_by_workspace, TeamFlowSteps,
 };
 use crate::work_mode::{
-    build_work_list, load_work_projects, read_work_item, refresh_work_feeds, resolve_team_flow,
-    store_team_flow, team_flow_rule_catalog, validate_team_flow_steps, work_feed_plan,
-    work_feeds_stale, TeamFlowScope, WorkItemRef,
+    build_work_list, default_team_flow_steps, load_work_projects, read_work_item,
+    refresh_work_feeds, resolve_team_flow, store_team_flow, team_flow_rule_catalog,
+    validate_team_flow_steps, work_feed_plan, work_feeds_stale, TeamFlowScope, WorkItemRef,
 };
 
 use super::*;
@@ -149,6 +150,18 @@ async fn list_work_items(
         .map_err(task_error)?;
     }
     list["refreshing"] = json!(refreshing);
+    // GitHub Projects need the `read:project` scope; a GitHub workspace's page shows a closable
+    // notice with the command while it is missing (crate::work_mode::github_projects).
+    let paths = state.paths.clone();
+    list["githubProjects"] = tokio::task::spawn_blocking(move || {
+        let mut status = crate::work_mode::github_projects_status_json();
+        status["noticeDismissed"] = json!(crate::storage::open_gxserver_database(&paths)
+            .ok()
+            .is_some_and(|db| crate::work_mode::work_notice_dismissed(&db, "githubProjectsScope")));
+        status
+    })
+    .await
+    .map_err(task_error)?;
     Ok(list)
 }
 
@@ -196,24 +209,71 @@ async fn read_work_item_route(
     }
 }
 
+/// The workspace a scope's steps come from: the workspace itself, or the project's (a worktree
+/// project follows its parent checkout).
+fn scope_workspace_id(
+    state: &AppState,
+    scope: &TeamFlowScope,
+) -> Result<Option<String>, DomainStateError> {
+    Ok(match scope {
+        TeamFlowScope::Workspace(id) => Some(id.clone()),
+        TeamFlowScope::Project(id) => load_work_projects(state, Some(std::slice::from_ref(id)))?
+            .into_iter()
+            .find(|project| &project.project_id == id)
+            .map(|project| project.workspace_id),
+        TeamFlowScope::Default => None,
+    })
+}
+
+/// The answer for a workspace connected to a team: the team's steps (the default flow while it
+/// has none) and whether this member may change them.
+fn team_answer(steps: TeamFlowSteps) -> Value {
+    let source = if steps.steps.is_some() {
+        "team"
+    } else {
+        "builtIn"
+    };
+    json!({
+        "steps": steps.steps.unwrap_or_else(default_team_flow_steps),
+        "source": source,
+        "team": true,
+        "canEdit": steps.can_edit,
+        "rules": team_flow_rule_catalog(),
+    })
+}
+
 /// `{ projectId? | workspaceId? | scope: "default" }` → the steps that scope uses, where they come
-/// from, and the rules a step can use.
+/// from, and the rules a step can use. In a workspace connected to a team: the team's steps,
+/// `team: true` and `canEdit`.
 fn read_team_flow(
     state: &AppState,
     params: &Map<String, Value>,
 ) -> Result<Value, DomainStateError> {
     let scope = TeamFlowScope::from_params(params);
-    let (project_id, workspace_id) = match &scope {
-        TeamFlowScope::Project(id) => (Some(id.as_str()), None),
-        TeamFlowScope::Workspace(id) => (None, Some(id.as_str())),
-        TeamFlowScope::Default => (None, None),
+    let workspace_id = scope_workspace_id(state, &scope)?;
+    if let Some(team) = workspace_id
+        .as_deref()
+        .and_then(|id| read_team_flow_steps(&state.paths, id))
+    {
+        return team.map(team_answer).map_err(DomainStateError::bad_request);
+    }
+    let project_id = match &scope {
+        TeamFlowScope::Project(id) => Some(id.as_str()),
+        _ => None,
     };
-    let (steps, source) = resolve_team_flow(&state.paths, project_id, workspace_id);
-    Ok(json!({ "steps": steps, "source": source, "rules": team_flow_rule_catalog() }))
+    let (steps, source) = resolve_team_flow(&state.paths, project_id, workspace_id.as_deref());
+    Ok(json!({
+        "steps": steps,
+        "source": source,
+        "team": false,
+        "canEdit": true,
+        "rules": team_flow_rule_catalog(),
+    }))
 }
 
 /// `{ projectId? | workspaceId? | scope: "default", steps }` saves; `reset: true` removes the
-/// scope's own steps so it uses the next one up again.
+/// scope's own steps so it uses the next one up again. In a workspace connected to a team it saves
+/// the team's steps, which only owners may change.
 fn update_team_flow(
     state: &AppState,
     params: &Map<String, Value>,
@@ -226,6 +286,14 @@ fn update_team_flow(
             || DomainStateError::bad_request("Pass steps, or reset: true."),
         )?)?)
     };
+    if let Some(saved) = scope_workspace_id(state, &scope)?
+        .as_deref()
+        .and_then(|id| store_team_flow_steps(&state.paths, id, steps.clone()))
+    {
+        return saved
+            .map(team_answer)
+            .map_err(DomainStateError::bad_request);
+    }
     store_team_flow(&state.paths, &scope, steps).map_err(|error| DomainStateError {
         code: "internalError",
         message: format!("Could not save the team flow: {error}"),

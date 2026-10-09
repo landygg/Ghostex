@@ -266,7 +266,7 @@ pub fn usage() -> String {
             "Resolve a repository into its clone URLs",
         ),
         format_help_command(
-            "clone-repository <remoteUrl> <destinationPath> --json",
+            "clone-repository <remoteUrl> <destinationPath> [--workspace name|id] --json",
             "Clone a repository and register it as a project (waits for the job)",
         ),
         format_help_command(
@@ -446,7 +446,15 @@ pub fn usage() -> String {
         ),
         format_help_command(
             "work-mode create-ticket --title t [--description d] [--team-id id] [--linear-project-id id] [--no-assign] [--start] | start <SPX-1245|#218|PR link> [--pr 412] [--agent id] [--model m] [--effort e]",
-            "Create a Linear ticket (assigned to you), or start an agent on a ticket in a worktree on its branch, linked to it; nothing is sent to the agent",
+            "Create a ticket assigned to you (a Linear ticket, or a GitHub issue when the workspace's tracker is GitHub), or start an agent on a ticket in a worktree on its branch, linked to it; nothing is sent to the agent",
+        ),
+        format_help_command(
+            "work-mode tracker [linear|github] [--workspace name|id | --project-id id | --path path]",
+            "Show or set the workspace's primary tracker: Linear tickets & projects, or GitHub issues & projects (a team workspace's owners set it for the whole team)",
+        ),
+        format_help_command(
+            "work-mode cleanup <session> clean-up|keep",
+            "Answer the offer a session gets when its linked PR is merged: remove its worktree and park it, or keep both",
         ),
         format_help_command(
             "workspace list | create <name> [--kind work|personal] | rename <workspace> <new name> | move-project <project> <workspace> | delete <workspace>",
@@ -461,16 +469,16 @@ pub fn usage() -> String {
             "Read or change the team's Slack flow: the working channel, watch-only channels, which repo each channel's work goes to, where new work runs, and the team instructions",
         ),
         format_help_command(
-            "team slack-manifest [--name n] | slack-connect | linear-connect [--dev]",
-            "Print the Slack app manifest for this team; store the Slack bot token and signing secret, or a Linear API key, on the team's Convex project (read from stdin)",
+            "team slack-manifest [--name n] | slack-connect [--dev] | linear-connect [--remove] | own-linear-key on|off",
+            "Print the Slack app manifest for this team; store the Slack bot token and signing secret on the team's Convex project (read from stdin); owners set or remove the team's Linear key (read from stdin); own-linear-key on creates the Slack tickets you request with this workspace's Linear key instead",
         ),
         format_help_command(
             "slack post [--session <session>] \"<text>\" [--final]",
             "Post to the Slack working thread of the session's ticket; --final also posts it once in the threads the request came from",
         ),
         format_help_command(
-            "link-session <selector> [--pr n|url|none] [--linear SPX-1,SPX-2|none] [--issue n|none] [--linear-project name|none] [--auto] | --candidates pullRequest|linearIssue|linearProject|githubIssue [--query text]",
-            "Link a session to a PR, Linear or GitHub issues and a Linear project; --auto goes back to what its branch says; --candidates lists what the Link to picker suggests",
+            "link-session <selector> [--pr n|url|none] [--linear SPX-1,SPX-2|none] [--issue n|none] [--linear-project name|none] [--github-project owner/number|none] [--auto] | --candidates pullRequest|linearIssue|linearProject|githubIssue|githubProject [--query text]",
+            "Link a session to a PR, Linear or GitHub issues, a Linear project or a GitHub Project; --auto goes back to what its branch says; --candidates lists what the Link to picker suggests",
         ),
         format_help_command(
             "tag-session <id> <tag|none>",
