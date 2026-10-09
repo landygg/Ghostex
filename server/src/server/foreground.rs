@@ -234,6 +234,23 @@ pub async fn run_gxserver_foreground(
             anyhow!(error)
         }
     })?;
+    let loopback_v6_listener = match bind_loopback_ipv6_twin(address).await {
+        Some(Ok(listener)) => Some(listener),
+        Some(Err(error)) => {
+            let _ = logger.log(GxserverLogInput {
+                level: crate::logging::LogLevel::Warn,
+                event: "loopbackIpv6ListenerUnavailable".to_string(),
+                server_id: Some(metadata.server_id.clone()),
+                request_id: None,
+                client: None,
+                duration_ms: None,
+                error: Some(error.to_string()),
+                details: Some(json!({ "port": local_port })),
+            });
+            None
+        }
+        None => None,
+    };
 
     title_job_recovery::recover_title_jobs_after_restart(&paths)?;
     write_runtime_metadata(&paths, &metadata)?;
@@ -352,6 +369,17 @@ pub async fn run_gxserver_foreground(
     let cleanup_paths = paths.clone();
     let cleanup_owner = metadata.clone();
     let (metadata_cleanup_tx, metadata_cleanup_rx) = tokio::sync::oneshot::channel();
+    let loopback_v6_task = loopback_v6_listener.map(|listener| {
+        let mut shutdown_rx = shutdown_tx.subscribe();
+        let app = app.clone();
+        tokio::spawn(async move {
+            axum::serve(listener, app)
+                .with_graceful_shutdown(async move {
+                    let _ = shutdown_rx.recv().await;
+                })
+                .await
+        })
+    });
     let serve_result = axum::serve(listener, app)
         .with_graceful_shutdown(async move {
             let _ = shutdown_rx.recv().await;
@@ -361,6 +389,9 @@ pub async fn run_gxserver_foreground(
                 metadata_cleanup_tx.send(remove_runtime_metadata(&cleanup_paths, &cleanup_owner));
         })
         .await;
+    if let Some(task) = loopback_v6_task {
+        task.abort();
+    }
     let metadata_cleanup_result = metadata_cleanup_rx.await;
     /*
     CDXC:ServerDaemon 2026-09-16 WHY:
@@ -436,6 +467,17 @@ pub async fn run_gxserver_foreground(
         });
     }
     Ok(GxserverForegroundResult { reused: false })
+}
+
+/// CDXC:ServerDaemon 2026-10-09 WHY:
+/// gxserver also listens on `[::1]` at its own port, serving the same router and token, because an SSH forward to `localhost:<port>` must reach it. Windows OpenSSH resolves `localhost` to `::1` first, reports the forwarded channel open after that connect is refused, and never tries `127.0.0.1`, so every phone request through such a forward ended empty and the phone's chat could not send. `127.0.0.1` stays the address every client is given (`ghostex server endpoint`, runtime metadata, tunnels); this twin is never required, so a port taken on `::1` or IPv6 being off only logs a warning.
+/// CDXC:ServerDaemon 2026-10-09 SEE-ALSO: `startPortForward` in apps/mobile/app/modules/ghostex-native/android/src/main/java/expo/modules/ghostexnative/GhostexSshConnection.kt, which now names `127.0.0.1` itself.
+async fn bind_loopback_ipv6_twin(address: SocketAddr) -> Option<std::io::Result<TcpListener>> {
+    if !matches!(address.ip(), std::net::IpAddr::V4(ip) if ip.is_loopback()) {
+        return None;
+    }
+    let twin = SocketAddr::from((std::net::Ipv6Addr::LOCALHOST, address.port()));
+    Some(TcpListener::bind(twin).await)
 }
 
 async fn wait_for_mismatched_gxserver_to_stop(
