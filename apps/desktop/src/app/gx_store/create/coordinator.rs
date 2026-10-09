@@ -75,7 +75,7 @@ fn coordinator_models(family: &str) -> Vec<NewCoordinatorModel> {
 /// server/src/coordinators/title.rs).
 fn coordinator_title(name: &str) -> (&str, &'static str) {
     if name.trim().is_empty() {
-        ("Coordinator", "placeholder")
+        ("Orchestrator", "placeholder")
     } else {
         (name, "user")
     }
@@ -219,7 +219,7 @@ impl GhostexGpuiApp {
                         Err(reason) => {
                             this.gx_store_create_toast(
                                 "warning",
-                                "Coordinator not created",
+                                "Orchestrator not created",
                                 Some(&reason),
                                 cx,
                             );
@@ -257,7 +257,7 @@ impl GhostexGpuiApp {
                         let _ = this.update(cx, |this, cx| {
                             this.gx_store_create_toast(
                                 "warning",
-                                "Coordinator's first request not sent",
+                                "Orchestrator's first request not sent",
                                 Some(&reason),
                                 cx,
                             );
@@ -289,7 +289,7 @@ impl GhostexGpuiApp {
         let Some(agent) = resolve_sidebar_agent(hud.as_deref(), agent_id) else {
             self.gx_store_create_toast(
                 "warning",
-                "Coordinator not created",
+                "Orchestrator not created",
                 Some("That agent is no longer configured."),
                 cx,
             );
@@ -311,7 +311,7 @@ impl GhostexGpuiApp {
                     let _ = this.update(cx, |this, cx| {
                         this.gx_store_create_toast(
                             "warning",
-                            "Coordinator not created",
+                            "Orchestrator not created",
                             Some(&message),
                             cx,
                         );
@@ -345,7 +345,7 @@ impl GhostexGpuiApp {
                     let _ = this.update(cx, |this, cx| {
                         this.gx_store_create_toast(
                             "warning",
-                            "Coordinator's first request not sent",
+                            "Orchestrator's first request not sent",
                             Some(&message),
                             cx,
                         );
@@ -390,13 +390,13 @@ impl GhostexGpuiApp {
             let _ = this.update(cx, |this, cx| match result {
                 Ok(_) => this.gx_store_create_toast(
                     "info",
-                    "Now a coordinator",
+                    "Now an orchestrator",
                     Some("Its playbook reaches it once its current turn is over."),
                     cx,
                 ),
                 Err(error) => this.gx_store_create_toast(
                     "warning",
-                    "Not made a coordinator",
+                    "Not made an orchestrator",
                     Some(&error.message),
                     cx,
                 ),

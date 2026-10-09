@@ -300,7 +300,7 @@ pub fn agent_launcher_items_with_accounts(
 /// SEE-ALSO: `agentMenuItems` in apps/mobile/app/src/screens/sessions-screen/use-sessions-screen-menus.tsx (the phone's agent menu keeps the same order).
 fn new_coordinator_row(group_id: &str) -> MenuItem {
     MenuItem::row(
-        "New Coordinator…",
+        "New Orchestrator…",
         "users-group",
         MenuCommand::project_action(group_id, "coordinator", None),
     )

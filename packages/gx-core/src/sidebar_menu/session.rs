@@ -568,7 +568,7 @@ fn full_menu(
         )
     {
         advanced.push(MenuItem::row(
-            "Make Coordinator",
+            "Make Orchestrator",
             "users-group",
             MenuCommand::session_action(id, "makeCoordinator"),
         ));

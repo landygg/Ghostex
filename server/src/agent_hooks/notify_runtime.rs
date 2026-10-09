@@ -326,7 +326,7 @@ pub fn run_notify_hook(args: Vec<String>) -> Result<Option<String>, DomainStateE
                 serde_json::to_string(&json!({ "additionalContext": context })).map_err(
                     |error| {
                         DomainStateError::bad_request(format!(
-                            "Could not serialize the coordinator session context: {error}"
+                            "Could not serialize the orchestrator session context: {error}"
                         ))
                     },
                 )?,

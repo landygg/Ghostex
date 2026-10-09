@@ -925,7 +925,7 @@ commands sent from the chat show in it with what they printed. Commands that
 open an Empryo panel (`/router`, `/models`, `/settings` and the like) show a card
 while the panel is open, with Close panel and Terminal View; a message sent from
 the chat closes the panel first. The Ghostex phone app opens Empryo sessions in
-chat too, with the same cards, and offers Fork and Make Coordinator on them.
+chat too, with the same cards, and offers Fork and Make Orchestrator on them.
 Scrolling up collapses the composer; returning to the bottom expands it.
 Settings > Chat > Keep chat box expanded while scrolling leaves the desktop
 chat box at full size instead (`sessionChatKeepComposerExpanded`, off by default).
@@ -1586,7 +1586,7 @@ PowerShell). Ghostex installs its hooks into Empryo's `hooks.json` (in `~/.empry
 or `%LOCALAPPDATA%\Empryo` on Windows) and never touches Empryo's `config.json`,
 so an Empryo session shows working and idle and comes back after a restart with
 `empryo --session <id>`. On Windows without WSL, Empryo's chat, fork, picker and
-coordinator work, but its sidebar status does not follow its hooks yet. Empryo has
+orchestrator work, but its sidebar status does not follow its hooks yet. Empryo has
 no launch option to accept every approval, so Agent approvals does not apply to it;
 Empryo's own `/yolo` does that instead.
 Agent Hooks let gxserver watch agent status, questions, and
@@ -1714,39 +1714,39 @@ approvals; Session resume hooks), `agentAcceptAllEnabled`,
 `agentHooksAutoInstall`, `showQuickModelPickerInTerminal` (Option+P model
 picker).
 
-## Coordinators
+## Orchestrators
 
-A coordinator is one agent you talk to about a stream of work in a project. You
+An orchestrator is one agent you talk to about a stream of work in a project. You
 tell it what needs doing; it answers quick questions itself and hands every real
 task to a thread, which is an ordinary agent session it starts and briefs, so it
 stays free to talk to you while the threads work in parallel. It is Ghostex's
 version of the Projects features in Cursor and Claude Code.
 
 - **Start one**: hover a project in the sidebar, open the Select Agent menu (the
-  arrow beside its agent button) and choose **New Coordinator…**, the first
+  arrow beside its agent button) and choose **New Orchestrator…**, the first
   item of that menu. On the phone, open the same menu from the project's agent
-  button and pick **New Coordinator…** at its top. Name it, pick
+  button and pick **New Orchestrator…** at its top. Name it, pick
   Claude, Codex, ZCode or Empryo and its model (Opus 5.5 on Claude, GLM 5.3 Flash on
   ZCode; without a choice each agent starts on its own default) and the effort
   the model takes — medium by default, which is plenty for routing work — and
   optionally give it a one-line goal and a first request;
   it opens in chat. The name is what its sidebar row shows, and the
-  coordinator keeps it: unlike other sessions it is not renamed from your
+  orchestrator keeps it: unlike other sessions it is not renamed from your
   first message (Rename in the sidebar still changes it; left blank, it is
   named once from its first conversation). A project can have several
-  coordinators, one per stream of work.
-- **Turn a session into a coordinator**: right-click a Claude, Codex, ZCode or
-  Empryo session in the sidebar, open **Advanced** and choose **Make Coordinator**
+  orchestrators, one per stream of work.
+- **Turn a session into an orchestrator**: right-click a Claude, Codex, ZCode or
+  Empryo session in the sidebar, open **Advanced** and choose **Make Orchestrator**
   (optionally with a goal); on the phone it is in the session's menu too.
   The session keeps its conversation and is never restarted or interrupted:
-  it gets the crown right away, and the coordinator playbook waits in its
+  it gets the crown right away, and the orchestrator playbook waits in its
   chat queue until its current turn is over. The next time the session
   starts again on its own (waking from sleep, a Full Reload, an app
-  restart) it runs with the coordinator role built in, like one made with
-  New Coordinator. Sessions it started before are not its threads yet; ask
-  it to adopt them. A thread of another coordinator, a session in a box, or
-  a draft cannot be made a coordinator.
-- **Threads in the sidebar**: a coordinator's row shows a crown in
+  restart) it runs with the orchestrator role built in, like one made with
+  New Orchestrator. Sessions it started before are not its threads yet; ask
+  it to adopt them. A thread of another orchestrator, a session in a box, or
+  a draft cannot be made an orchestrator.
+- **Threads in the sidebar**: an orchestrator's row shows a crown in
   place of its agent's logo, and a crew icon
   with one number: how many of its threads are working; when none are
   working, how many are waiting on you; when neither, how many threads it
@@ -1757,25 +1757,25 @@ version of the Projects features in Cursor and Claude Code.
   working, waiting, or active in the last 2 hours. Older threads wait behind an
   "N older threads" row at the end, which lists them all (and "Hide older
   threads" tucks them away again; both remembered across restarts). The chevron
-  that replaces the crown when you hover the coordinator folds its threads away
-  and back, and a folded coordinator keeps its number and colour. Opening a
-  coordinator's chat leaves both as you set them; opening one of its threads
-  unfolds the coordinator so the thread shows. Click a thread to watch it or
+  that replaces the crown when you hover the orchestrator folds its threads away
+  and back, and a folded orchestrator keeps its number and colour. Opening a
+  orchestrator's chat leaves both as you set them; opening one of its threads
+  unfolds the orchestrator so the thread shows. Click a thread to watch it or
   talk to it directly; answer its questions and approvals there. A thread keeps
-  the name its coordinator gave it, like the coordinator keeps its own (Rename in
+  the name its orchestrator gave it, like the orchestrator keeps its own (Rename in
   the sidebar still changes it). Pinning the
-  coordinator takes its threads along. The phone's session list shows the same
-  tree: crown, crew count, threads indented under their coordinator, and the
+  orchestrator takes its threads along. The phone's session list shows the same
+  tree: crown, crew count, threads indented under their orchestrator, and the
   chevron to fold them.
-- **Finished threads are closed**: once the coordinator has checked and
+- **Finished threads are closed**: once the orchestrator has checked and
   committed a thread's work and expects nothing more from it, it marks the
   thread done and closes its session, so the sidebar keeps only work in flight
   (it never closes a thread that is still working or waiting on you). A closed
-  thread is not lost: when a follow-up comes, the coordinator reopens it or
-  messages it, and the same conversation resumes under the coordinator with
-  everything it knew. Ask the coordinator to keep a thread open if you want to
+  thread is not lost: when a follow-up comes, the orchestrator reopens it or
+  messages it, and the same conversation resumes under the orchestrator with
+  everything it knew. Ask the orchestrator to keep a thread open if you want to
   look at it.
-- **Threads panel in the chat**: above the coordinator's message box, the
+- **Threads panel in the chat**: above the orchestrator's message box, the
   Threads panel lists the working threads first, then the ones active in the
   last 2 hours, each with one line (what it is doing or how its last report
   began) and its branch; "N more" lists every other thread, closed ones
@@ -1783,55 +1783,57 @@ version of the Projects features in Cursor and Claude Code.
   it and talk to it. A thread stuck on something only you can allow (a
   permission prompt or a folder-trust question) carries an amber "Needs your
   approval" tag. Fold the panel with its header and it stays folded the next
-  time you open a coordinator's chat. It shows on the phone and in the browser
+  time you open an orchestrator's chat. It shows on the phone and in the browser
   too.
 - **Reports come back by themselves**: when a thread finishes a turn, Ghostex
-  sends its final message to the coordinator (a "Message from" card in its
+  sends its final message to the orchestrator (a "Message from" card in its
   chat); when a thread waits on a question, an approval, or a screen such as
-  folder trust or an expired login, the coordinator is told what it is asking.
-  The coordinator then checks the work, commits it (only that thread's files,
+  folder trust or an expired login, the orchestrator is told what it is asking.
+  The orchestrator then checks the work, commits it (only that thread's files,
   and it never pushes unless you ask), starts the next step, and tells you
   what needs you. Nobody has to poll.
-- **Work that never arrives is caught**: when the coordinator starts a thread,
+- **Work that never arrives is caught**: when the orchestrator starts a thread,
   it waits until the thread has actually taken its brief before saying it is
   under way, and says "pending" with the reason when it has not yet. Ghostex
-  keeps watching every brief and follow-up the coordinator sends: if a thread
-  sits idle without it, the coordinator is told the message did not reach it
+  keeps watching every brief and follow-up the orchestrator sends: if a thread
+  sits idle without it, the orchestrator is told the message did not reach it
   and sends it again, so work handed out is never silently dropped.
-- **Thread models**: the coordinator picks each Claude thread's model when it
+- **Thread models**: the orchestrator picks each Claude thread's model when it
   starts it: Opus 5.5 at high effort for substantial work, Opus 5.5 at medium
   for hard but small changes, Sonnet 5.5 at high for small contained fixes. It
   never switches a running thread's model (that throws away its prompt cache);
   a follow-up that needs a stronger model gets a new thread.
 - **Worktrees**: threads that need the same files run one after another; when
-  running them in parallel matters, the coordinator gives a thread its own git
-  worktree and branch, so parallel threads never edit the same checkout. A coordinator's
+  running them in parallel matters, the orchestrator gives a thread its own git
+  worktree and branch, so parallel threads never edit the same checkout. An orchestrator's
   threads trust the project's own folder and the worktrees Ghostex makes for
   them, so they start without stopping at the agent's folder-trust question.
 - **Goal, standing instructions and memory**: every thread's brief carries the
-  coordinator's goal, its standing instructions (rules such as which branch to
+  orchestrator's goal, its standing instructions (rules such as which branch to
   target or how to verify work) and its memory notes. When you state a lasting
-  preference, the coordinator proposes the exact wording and saves it as a
+  preference, the orchestrator proposes the exact wording and saves it as a
   note every later thread receives once you confirm; ask it
   to change the goal or the instructions the same way.
 - **Just ask**: "run these three as separate threads", "use worktrees", "give me
   a status of every thread", "use a cheaper model for threads", "don't merge
   anything without asking" all work in plain words.
 
-Coordinators run on Claude, Codex, ZCode or Empryo; threads can be any configured
-agent. An Empryo coordinator runs as the Empryo agent `ghostex-coordinator`: Ghostex
+Orchestrators run on Claude, Codex, ZCode or Empryo; threads can be any configured
+agent. An Empryo orchestrator runs as the Empryo agent `ghostex-coordinator`: Ghostex
 keeps its playbook in `~/.empryo/agents/ghostex-coordinator.md` and switches the
 session to it with `/agent ghostex-coordinator` before anything else, so leave that
-file in place. From a terminal or another agent: `ghostex coordinator create --title <name>
-[--model <m>] [--effort <e>] [--goal <text>] [--task <first request>]`, `ghostex coordinator
-promote <session> [--goal <text>]` (make an existing session a coordinator), `ghostex coordinator status`,
-`ghostex coordinator options` (the agents, models and efforts a coordinator can use),
-`ghostex coordinator start-thread --title <title> --task <brief> [--worktree]
-[--agent <id>] [--model <m>] [--effort <e>]`, `ghostex coordinator resolve
-<thread> [--keep-open]` (mark done and close its session), `ghostex coordinator
-reopen <thread>` (resume a closed thread), `ghostex coordinator remember <note>`, `ghostex
-coordinator set-goal|set-instructions`, and `ghostex coordinator guide` (the
-coordinator's own playbook). `ghostex coordinator --help` lists every flag.
+file in place. From a terminal or another agent: `ghostex orchestrator create --title <name>
+[--model <m>] [--effort <e>] [--goal <text>] [--task <first request>]`, `ghostex orchestrator
+promote <session> [--goal <text>]` (make an existing session an orchestrator), `ghostex orchestrator status`,
+`ghostex orchestrator options` (the agents, models and efforts an orchestrator can use),
+`ghostex orchestrator start-thread --title <title> --task <brief> [--worktree]
+[--agent <id>] [--model <m>] [--effort <e>]`, `ghostex orchestrator resolve
+<thread> [--keep-open]` (mark done and close its session), `ghostex orchestrator
+reopen <thread>` (resume a closed thread), `ghostex orchestrator remember <note>`, `ghostex
+orchestrator set-goal|set-instructions`, and `ghostex orchestrator guide` (the
+orchestrator's own playbook). `ghostex orchestrator --help` lists every flag. Older
+Ghostex releases call the orchestrator a coordinator and name the same verbs
+`ghostex coordinator …`; that name still works.
 
 ## Project board (Kanban)
 

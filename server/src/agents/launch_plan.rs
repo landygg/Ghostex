@@ -76,7 +76,7 @@ pub(crate) fn create_agent_session_params_for_project(
         Some(_) => {
             if crate::coordinators::coordinator_create_request(params)?.is_some() {
                 return Err(DomainStateError::bad_request(
-                    "A coordinator runs on this computer. Start it without a box.",
+                    "An orchestrator runs on this computer. Start it without a box.",
                 ));
             }
             Some(crate::agentbox::box_agent_family(
@@ -481,7 +481,7 @@ fn apply_requested_agent_model(
         }
         if crate::coordinators::coordinator_create_request(params)?.is_none() {
             return Err(DomainStateError::bad_request(
-                "A ZCode thread keeps its configured model; only a coordinator's own model can be set.",
+                "A ZCode thread keeps its configured model; only an orchestrator's own model can be set.",
             ));
         }
         return Ok((command, None));
@@ -582,13 +582,13 @@ fn apply_coordinator_role(
         return Ok(command);
     };
     let role_file = request.role_file.ok_or_else(|| {
-        DomainStateError::corrupt_state("The coordinator role file was not prepared.")
+        DomainStateError::corrupt_state("The orchestrator role file was not prepared.")
     })?;
     let family = resume_agent_family_id(Some(agent_id.to_string()), agent_config, launch_settings)
         .filter(|family| crate::coordinators::coordinator_agent_family_supported(family))
         .ok_or_else(|| {
             DomainStateError::bad_request(format!(
-                "A coordinator runs on {}. Pick one of those agents.",
+                "An orchestrator runs on {}. Pick one of those agents.",
                 crate::coordinators::COORDINATOR_AGENT_FAMILIES_TEXT
             ))
         })?;

@@ -31,7 +31,7 @@ CHOOSE AND CREATE
   initial message when input is ready; --body-file reads that task from disk.
   Without either, the agent starts waiting for a message. --title sets the
   initial name; the agent's own auto-naming can replace it, except for a thread
-  created by a coordinator, which keeps its --title (only a user's rename
+  created by an orchestrator, which keeps its --title (only a user's rename
   changes it). Copy globalRef from the result for follow-ups. Created does
   not mean the task has completed.
 
@@ -118,8 +118,8 @@ DELIVERY
   true) instead of typing it again, a retry of one that was refused before
   anything was submitted sends it now, and --interrupt is not repeated. A
   send without --request-id is always a new message.
-  A coordinator's message to its own thread is also watched by Ghostex: if
-  the thread goes idle without it, the coordinator gets a thread report
+  An orchestrator's message to its own thread is also watched by Ghostex: if
+  the thread goes idle without it, the orchestrator gets a thread report
   saying the message did not reach it.
 
   Control characters in the text (other than newline and tab) are sent as

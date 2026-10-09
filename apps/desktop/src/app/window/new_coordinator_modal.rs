@@ -17,11 +17,11 @@ use std::rc::Rc;
 pub(crate) const NEW_COORDINATOR_MODAL_WIDTH: f32 = 540.0;
 pub(crate) const NEW_COORDINATOR_MODAL_INITIAL_HEIGHT: f32 = 640.0;
 
-const TITLE: &str = "New Coordinator";
+const TITLE: &str = "New Orchestrator";
 const FIELD_NAME: &str = "Name";
 const NAME_PLACEHOLDER: &str = "e.g. Checkout redesign";
 const NAME_HINT: &str =
-    "Shown in the sidebar so you can find this coordinator later. It keeps this name.";
+    "Shown in the sidebar so you can find this orchestrator later. It keeps this name.";
 const FIELD_AGENT: &str = "Agent";
 const FIELD_MODEL: &str = "Model";
 const FIELD_EFFORT: &str = "Effort";
@@ -378,7 +378,7 @@ impl GpuiNewCoordinatorModalWindow {
         if self.agents.is_empty() {
             body = body.child(modal_error(
                 &p,
-                "A coordinator runs on Claude, Codex, ZCode or Empryo. Add one of them in Settings > Agents first.",
+                "An orchestrator runs on Claude, Codex, ZCode or Empryo. Add one of them in Settings > Agents first.",
             ));
         } else if self.agents.len() > 1 {
             let items = self
@@ -432,7 +432,7 @@ impl GpuiNewCoordinatorModalWindow {
                 .child(modal_hint(
                     &p,
                     format!(
-                        "Threads show up under the coordinator in the sidebar. Press {} to create.",
+                        "Threads show up under the orchestrator in the sidebar. Press {} to create.",
                         crate::hotkey_label::terminal_overlay_hotkey_chord_label("cmd+enter")
                     ),
                 )),
@@ -723,7 +723,7 @@ impl Render for GpuiMakeCoordinatorModalWindow {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let p = self.palette;
         let description = format!(
-            "\"{}\" keeps its conversation and keeps running: nothing restarts or interrupts it. It gets the crown now, and its coordinator playbook arrives once its current turn is over.",
+            "\"{}\" keeps its conversation and keeps running: nothing restarts or interrupts it. It gets the crown now, and its orchestrator playbook arrives once its current turn is over.",
             self.session_title
         );
         let body = v_flex()
@@ -733,7 +733,7 @@ impl Render for GpuiMakeCoordinatorModalWindow {
             .child(modal_text_input(&p, &self.goal_input, false, window, cx))
             .child(modal_hint(
                 &p,
-                "Sessions it started before are not its threads yet; ask it to adopt them (ghostex coordinator link).",
+                "Sessions it started before are not its threads yet; ask it to adopt them (ghostex orchestrator link).",
             ))
             .into_any_element();
         let cancel = modal_action_button(
@@ -749,7 +749,7 @@ impl Render for GpuiMakeCoordinatorModalWindow {
         let make = modal_action_button(
             &p,
             "make-coordinator-confirm",
-            "Make Coordinator",
+            "Make Orchestrator",
             None,
             ModalButtonTone::Primary,
             false,
@@ -763,7 +763,7 @@ impl Render for GpuiMakeCoordinatorModalWindow {
             &self.fit,
             Self::on_key_down,
             vec![
-                modal_header(&p, "Make Coordinator", Some(description)),
+                modal_header(&p, "Make Orchestrator", Some(description)),
                 body,
             ],
             modal_footer(vec![cancel, make]),

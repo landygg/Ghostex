@@ -52,13 +52,15 @@ does not say whether the session is running or busy: check
 
 When the user wants an agent that keeps handing work to other agents and
 reporting back ("be my lead on this", "run these as parallel threads and tell
-me when they are done"), a Ghostex coordinator does that with supervision built
+me when they are done"), a Ghostex orchestrator does that with supervision built
 in: Ghostex sends it each thread's final message and every question a thread is
-stuck on, so nothing has to poll. Start one with `ghostex coordinator create`
-(Ghostex releases from 2026-09-30 on; if `ghostex coordinator --help` is
-missing, the installed Ghostex is older, so use the workflow below instead). If
-you are a coordinator yourself, follow `ghostex coordinator guide` rather than
-the waiting habits below.
+stuck on, so nothing has to poll. Start one with `ghostex orchestrator create`.
+Older Ghostex releases call it a coordinator and name the same verbs
+`ghostex coordinator …` (from 2026-09-30 on), so if `ghostex orchestrator --help`
+is missing, use `ghostex coordinator` instead; if both are missing, the installed
+Ghostex is older, so use the workflow below instead. If you are an orchestrator
+yourself, follow `ghostex orchestrator guide` (older releases:
+`ghostex coordinator guide`) rather than the waiting habits below.
 
 ## Core workflow
 
@@ -92,7 +94,8 @@ the waiting habits below.
    is not there yet, and older CLIs only ever say `accepted` or `queued`.
    Unless the result says `delivered`, read the session chat (or the queue)
    before you assume the agent is working on it, and before you ever send the
-   same message again. `ghostex coordinator start-thread` likewise answers
+   same message again. `ghostex orchestrator start-thread` (`ghostex coordinator
+   start-thread` in older releases) likewise answers
    `started` only once the thread's transcript shows the brief, else
    `pending` with the reason; older CLIs print "Started thread" without
    checking, so read the thread's chat. None of these means the agent has read it.

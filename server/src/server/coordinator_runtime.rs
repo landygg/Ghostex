@@ -1018,7 +1018,7 @@ pub(crate) fn prepare_coordinator_create_params(
     let role_file = coordinators::ensure_coordinator_role_file(&state.paths).map_err(|error| {
         DomainStateError {
             code: "internalError",
-            message: format!("Could not write the coordinator role file: {error}"),
+            message: format!("Could not write the orchestrator role file: {error}"),
         }
     })?;
     coordinator.insert(
@@ -1069,7 +1069,7 @@ pub(crate) fn queue_coordinator_role_command(
     coordinators::ensure_empryo_coordinator_agent_file(&state.paths).map_err(|error| {
         DomainStateError {
             code: "internalError",
-            message: format!("Could not write the Empryo coordinator profile: {error}"),
+            message: format!("Could not write the Empryo orchestrator profile: {error}"),
         }
     })?;
     queue_session_chat_prompt(state, project_id, session_id, command, startup_send)
@@ -1087,7 +1087,7 @@ pub(crate) fn promote_coordinator(
     let role_file = coordinators::ensure_coordinator_role_file(&state.paths).map_err(|error| {
         DomainStateError {
             code: "internalError",
-            message: format!("Could not write the coordinator role file: {error}"),
+            message: format!("Could not write the orchestrator role file: {error}"),
         }
     })?;
     let promotion = coordinators::promote_session_to_coordinator(

@@ -8,7 +8,7 @@ automation and remote-access layers around those sessions.
 
 Run `ghostex guide <chapter>` for the details:
 
-features Views, sidebar, sessions, chat, agents and orchestration, coordinators, browser,
+features Views, sidebar, sessions, chat, agents and orchestration, orchestrators, browser,
 editor, board, docs, automations, remote and mobile, notifications
 settings Every setting with its key, type, allowed values, default, and
 the page it lives on (use with `ghostex settings`)
@@ -78,10 +78,10 @@ hotkeys Every shortcut and its default binding
   terminal for the same session with one click or hotkey.
 - **Agents**: the configured agent buttons per project (built-in CLIs plus
   custom commands), Global Actions, and the Agents Hub catalog.
-- **Coordinator**: an agent session you talk to that hands the work to
+- **Orchestrator**: an agent session you talk to that hands the work to
   threads (agent sessions it starts, shown indented under it in the sidebar)
   and reports back when they finish or need you. Start one from a project's
-  Select Agent menu with New Coordinator.
+  Select Agent menu with New Orchestrator.
 - **Extensions**: optional views and panels (Code, Browser, Kanban, Automate,
   Files, and third-party ones) installed from Settings > Extensions.
 - **gxserver**: the local daemon that owns sessions, projects, settings sync,

@@ -133,13 +133,13 @@ Fuzzy search every prompt you ever sent, across all your agents, and press Enter
 
 ### Agents that run agents
 
-Agents can open sessions, send prompts, and read replies from other agents through the `ghostex` command. Ask Claude Code to spin up Codex sub-agents and steer them, or hand the work to a coordinator that keeps track of them for you.
+Agents can open sessions, send prompts, and read replies from other agents through the `ghostex` command. Ask Claude Code to spin up Codex sub-agents and steer them, or hand the work to an orchestrator that keeps track of them for you.
 
 <br/>
 
 </td>
 <td width="50%">
-  <img src="media/readme/gx-threads.jpg" alt="A coordinator with its threads in the sidebar and the Threads panel" width="100%" />
+  <img src="media/readme/gx-threads.jpg" alt="An orchestrator with its threads in the sidebar and the Threads panel" width="100%" />
 </td>
 </tr>
 </table>

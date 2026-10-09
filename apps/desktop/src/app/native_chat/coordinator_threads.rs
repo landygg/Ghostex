@@ -99,7 +99,7 @@ impl NativeChatView {
             div()
                 .id("chat-coordinator-threads")
                 .role(gpui::Role::Group)
-                .aria_label("Coordinator threads")
+                .aria_label("Orchestrator threads")
                 .w_full()
                 .child(self.status_card_with_header_motion(
                     super::cards::CardBodyMotion {

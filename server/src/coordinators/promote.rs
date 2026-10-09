@@ -52,13 +52,13 @@ pub fn promote_session_to_coordinator(
     let (project_id, session_id) = (text("projectId"), text("sessionId"));
     if project_id.is_empty() || session_id.is_empty() {
         return Err(DomainStateError::bad_request(
-            "Making a coordinator needs projectId and sessionId.",
+            "Making an orchestrator needs projectId and sessionId.",
         ));
     }
     let goal = text("goal");
     if goal.chars().count() > COORDINATOR_GOAL_MAX_CHARS {
         return Err(DomainStateError::bad_request(format!(
-            "Keep the goal under {COORDINATOR_GOAL_MAX_CHARS} characters; set standing instructions later with ghostex coordinator set-instructions."
+            "Keep the goal under {COORDINATOR_GOAL_MAX_CHARS} characters; set standing instructions later with ghostex orchestrator set-instructions."
         )));
     }
     // One writer reservation over the read and both writes, so a hook updating the session in
@@ -84,7 +84,7 @@ pub fn promote_session_to_coordinator(
         .filter(|family| coordinator_agent_family_supported(family))
         .ok_or_else(|| {
             DomainStateError::bad_request(format!(
-                "A coordinator runs on {COORDINATOR_AGENT_FAMILIES_TEXT}, and this session runs another agent. Start a New Coordinator instead."
+                "An orchestrator runs on {COORDINATOR_AGENT_FAMILIES_TEXT}, and this session runs another agent. Start a New Orchestrator instead."
             ))
         })?;
 
@@ -157,7 +157,7 @@ fn refuse_ineligible(
 ) -> Result<(), DomainStateError> {
     if read_coordinator(db, project_id, session_id)?.is_some() {
         return Err(DomainStateError::bad_request(
-            "That session is already a coordinator.",
+            "That session is already an orchestrator.",
         ));
     }
     if let Some(thread) = read_thread(db, project_id, session_id)? {
@@ -168,25 +168,25 @@ fn refuse_ineligible(
             )?
             .map(|coordinator| session_title_of(&coordinator))
             .filter(|title| !title.trim().is_empty())
-            .unwrap_or_else(|| "another coordinator".to_string());
+            .unwrap_or_else(|| "another orchestrator".to_string());
         return Err(DomainStateError::bad_request(format!(
-            "That session is a thread of \"{coordinator}\". A thread reports to its coordinator, so it cannot also lead threads of its own; make another session the coordinator instead."
+            "That session is a thread of \"{coordinator}\". A thread reports to its orchestrator, so it cannot also lead threads of its own; make another session the orchestrator instead."
         )));
     }
     if session.get("kind").and_then(Value::as_str) != Some("agent") {
         return Err(DomainStateError::bad_request(
-            "Only an agent session can become a coordinator.",
+            "Only an agent session can become an orchestrator.",
         ));
     }
     if crate::agentbox::is_agentbox_session(session) {
         return Err(DomainStateError::bad_request(
-            "A coordinator runs on this computer, so a session in a box cannot become one.",
+            "An orchestrator runs on this computer, so a session in a box cannot become one.",
         ));
     }
     // A draft can still switch its agent before its first prompt, and the role would not follow.
     if crate::agents::session_is_draft(session) {
         return Err(DomainStateError::bad_request(
-            "This session has not started its conversation yet. Send it a first message first, or start a New Coordinator instead.",
+            "This session has not started its conversation yet. Send it a first message first, or start a New Orchestrator instead.",
         ));
     }
     Ok(())
@@ -207,21 +207,21 @@ fn command_has_coordinator_role(command: &str, family: &str) -> bool {
 /// the playbook when it reads this, so its message leaves the playbook out.
 pub fn playbook_message(goal: &str, role_in_system_prompt: bool) -> String {
     let mut message = String::from(if role_in_system_prompt {
-        "Ghostex: this session is now a coordinator. You keep this conversation; from now on you work by the coordinator playbook, which is now part of your instructions."
+        "Ghostex: this session is now an orchestrator. You keep this conversation; from now on you work by the orchestrator playbook, which is now part of your instructions."
     } else {
-        "Ghostex: this session is now a coordinator. You keep this conversation; from now on you work by the coordinator playbook below."
+        "Ghostex: this session is now an orchestrator. You keep this conversation; from now on you work by the orchestrator playbook below."
     });
     if !goal.trim().is_empty() {
         message.push_str(&format!("\n\nYour goal: {}", goal.trim()));
     }
     if !role_in_system_prompt {
         message.push_str(
-            "\n\nGhostex adds this playbook to your system prompt the next time this session starts or resumes. Until then, re-read it with `ghostex coordinator guide` whenever your context was compacted.",
+            "\n\nGhostex adds this playbook to your system prompt the next time this session starts or resumes. Until then, re-read it with `ghostex orchestrator guide` whenever your context was compacted.",
         );
     }
     message.push_str(
-        "\n\nSessions you started earlier in this conversation are not your threads yet. If there are any, list them for the user and, once they confirm, adopt each one with `ghostex coordinator link <session ref> --task \"<what it works on>\"`.\
-\n\nNow run `ghostex coordinator status`, then tell the user in a line or two that you are their coordinator.",
+        "\n\nSessions you started earlier in this conversation are not your threads yet. If there are any, list them for the user and, once they confirm, adopt each one with `ghostex orchestrator link <session ref> --task \"<what it works on>\"`.\
+\n\nNow run `ghostex orchestrator status`, then tell the user in a line or two that you are their orchestrator.",
     );
     if !role_in_system_prompt {
         message.push_str("\n\n---\n\n");

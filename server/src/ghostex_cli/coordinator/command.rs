@@ -9,6 +9,8 @@ use crate::ghostex_cli::{
     selector, sessions,
 };
 
+/// CDXC:Coordinators 2026-10-10 DECISION:
+/// User: "let's please rename "Coordinator" to "Orchestrator" everywhere so it's clearer to everyone." `ghostex orchestrator` (and `--orchestrator <ref>`) is the documented name; `ghostex coordinator` and `--coordinator` stay as hidden aliases so running sessions, playbook copies and older installs keep working. Internal names (code, routes, JSON fields, saved data) keep "coordinator".
 /// CDXC:Coordinators 2026-09-30 WHY:
 /// One verb family for everything a coordinator (or a user steering one) does, so the coordinator's playbook can name exact commands and `ghostex coordinator --help` is the one page to read. Messaging and reading threads stay on the existing `ghostex agents send` and `read-session-chat`, which already carry the sender header and reply reference.
 pub(crate) fn run(args: &[String]) -> CliResult<()> {
@@ -37,7 +39,7 @@ pub(crate) fn run(args: &[String]) -> CliResult<()> {
         "resolve" | "reopen" => threads::set_resolved(&parsed, command == "resolve"),
         "remember" | "forget" | "set-goal" | "set-instructions" => update(command, &parsed),
         other => Err(CliError::Other(format!(
-            "Unknown coordinator command: {other}. See ghostex coordinator --help."
+            "Unknown orchestrator command: {other}. See ghostex orchestrator --help."
         ))),
     }
 }
@@ -74,15 +76,16 @@ pub(super) fn resolve_thread_session(reference: &str, flags: &Flags) -> CliResul
     Ok((row, flags))
 }
 
-/// The coordinator a command acts on: `--coordinator <ref>`, else the calling session.
+/// The coordinator a command acts on: `--orchestrator <ref>` (or the older `--coordinator <ref>`),
+/// else the calling session.
 pub(super) fn target_coordinator(parsed: &ParsedArgs) -> CliResult<(Value, Flags)> {
     let base = server_flags(&parsed.flags);
-    match flag_text(&parsed.flags, "coordinator") {
+    match flag_text(&parsed.flags, "orchestrator").or_else(|| flag_text(&parsed.flags, "coordinator")) {
         Some(reference) => resolve_session(&reference, &base),
         None => {
             let caller = agents::caller().map_err(|error| {
                 CliError::Other(format!(
-                    "{error} Outside a coordinator session, pass --coordinator <ref>."
+                    "{error} Outside an orchestrator session, pass --orchestrator <ref>."
                 ))
             })?;
             let flags = agents::inventory_flags(&base, agents::text(&caller, "globalRef"))?;
@@ -159,7 +162,7 @@ fn create(parsed: &ParsedArgs) -> CliResult<()> {
     } else {
         "placeholder"
     };
-    let title = named.unwrap_or_else(|| "Coordinator".to_string());
+    let title = named.unwrap_or_else(|| "Orchestrator".to_string());
     let goal = flag_text(&parsed.flags, "goal").unwrap_or_default();
     let family = agent_rows
         .iter()
@@ -218,7 +221,7 @@ fn create(parsed: &ParsedArgs) -> CliResult<()> {
     )
     .map_err(|error| {
         CliError::Other(format!(
-            "Created coordinator {reference}, but its agent did not start: {error}. Open it in Ghostex to retry; do not create another."
+            "Created orchestrator {reference}, but its agent did not start: {error}. Open it in Ghostex to retry; do not create another."
         ))
     })?;
     let mut result = json!({
@@ -256,7 +259,7 @@ fn create(parsed: &ParsedArgs) -> CliResult<()> {
     if parsed.flags.truthy("json") {
         print_json(&result);
     } else {
-        println!("Created coordinator \"{title}\" ({reference}).");
+        println!("Created orchestrator \"{title}\" ({reference}).");
         println!("Talk to it in Ghostex, or send it work with: ghostex agents send {reference} \"<request>\"");
     }
     Ok(())
@@ -272,7 +275,7 @@ fn promote(parsed: &ParsedArgs) -> CliResult<()> {
         None => {
             let caller = agents::caller().map_err(|error| {
                 CliError::Other(format!(
-                    "{error} Outside an agent session, pass the session to promote: ghostex coordinator promote <session-ref>."
+                    "{error} Outside an agent session, pass the session to promote: ghostex orchestrator promote <session-ref>."
                 ))
             })?;
             let flags = agents::inventory_flags(&base, agents::text(&caller, "globalRef"))?;
@@ -293,18 +296,18 @@ fn promote(parsed: &ParsedArgs) -> CliResult<()> {
     }
     let reference = agents::text(&result, "globalRef");
     println!(
-        "\"{}\" ({reference}) is now a coordinator. Its running turn was not interrupted.",
+        "\"{}\" ({reference}) is now an orchestrator. Its running turn was not interrupted.",
         agents::text(&result, "title")
     );
     if result["playbookQueued"].as_bool() == Some(true) {
         println!("Its playbook is queued and reaches it once it is idle; its next resume loads the role as a system prompt.");
     } else {
         println!(
-            "Its playbook could not be queued ({}). Send it with: ghostex agents send {reference} \"Run ghostex coordinator guide and follow it from now on.\"",
+            "Its playbook could not be queued ({}). Send it with: ghostex agents send {reference} \"Run ghostex orchestrator guide and follow it from now on.\"",
             agents::text(&result, "playbookError")
         );
     }
-    println!("Sessions it started earlier are not its threads yet; adopt each with: ghostex coordinator link <session-ref> --coordinator {reference}");
+    println!("Sessions it started earlier are not its threads yet; adopt each with: ghostex orchestrator link <session-ref> --orchestrator {reference}");
     Ok(())
 }
 
@@ -481,7 +484,7 @@ fn list(parsed: &ParsedArgs) -> CliResult<()> {
         .cloned()
         .unwrap_or_default();
     if rows.is_empty() {
-        println!("No coordinators. Create one with: ghostex coordinator create --title \"<name>\"");
+        println!("No orchestrators. Create one with: ghostex orchestrator create --title \"<name>\"");
         return Ok(());
     }
     for row in rows {
@@ -524,7 +527,7 @@ fn first_line(text: &str, max: usize) -> String {
 pub(super) fn print_status(view: &Value, all: bool) {
     let coordinator = &view["coordinator"];
     println!(
-        "Coordinator: {} ({})",
+        "Orchestrator: {} ({})",
         agents::text(coordinator, "title"),
         agents::text(coordinator, "globalRef")
     );
@@ -553,7 +556,7 @@ pub(super) fn print_status(view: &Value, all: bool) {
     }
     let threads = view["threads"].as_array().cloned().unwrap_or_default();
     if threads.is_empty() {
-        println!("Threads: none yet. Start one with: ghostex coordinator start-thread --title \"<title>\" --task \"<brief>\"");
+        println!("Threads: none yet. Start one with: ghostex orchestrator start-thread --title \"<title>\" --task \"<brief>\"");
         return;
     }
     println!("Threads:");
@@ -574,7 +577,7 @@ pub(super) fn print_status(view: &Value, all: bool) {
         }
         if state == "done" && !all {
             println!(
-                "  Done: {} (ghostex coordinator status --all lists them)",
+                "  Done: {} (ghostex orchestrator status --all lists them)",
                 group.len()
             );
             continue;
@@ -624,7 +627,7 @@ fn update(command: &str, parsed: &ParsedArgs) -> CliResult<()> {
         "remember" => {
             if value.trim().is_empty() {
                 return Err(CliError::Other(
-                    "Usage: ghostex coordinator remember \"<one line>\"".into(),
+                    "Usage: ghostex orchestrator remember \"<one line>\"".into(),
                 ));
             }
             params["remember"] = json!(value);
@@ -637,7 +640,7 @@ fn update(command: &str, parsed: &ParsedArgs) -> CliResult<()> {
                 .filter(|number| *number > 0)
                 .ok_or_else(|| {
                     CliError::Other(
-                        "Usage: ghostex coordinator forget <number> (numbers come from ghostex coordinator status).".into(),
+                        "Usage: ghostex orchestrator forget <number> (numbers come from ghostex orchestrator status).".into(),
                     )
                 })?;
             params["forget"] = json!(number);

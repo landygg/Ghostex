@@ -517,8 +517,8 @@ pub fn usage() -> String {
             "Communicate and coordinate with other agents",
         ),
         format_help_command(
-            "coordinator --help",
-            "Run a coordinator: one agent you talk to that starts, supervises, and reports on thread sessions",
+            "orchestrator --help",
+            "Run an orchestrator: one agent you talk to that starts, supervises, and reports on thread sessions",
         ),
         format_help_command(
             "agentbox status | list | url <session> [--screen] [--json]",

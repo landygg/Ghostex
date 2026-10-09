@@ -111,7 +111,7 @@ pub(super) fn start_thread(parsed: &ParsedArgs) -> CliResult<()> {
     };
     if session_id.is_empty() {
         return Err(CliError::Other(
-            "The create response has no session id. Run ghostex coordinator status before retrying.".into(),
+            "The create response has no session id. Run ghostex orchestrator status before retrying.".into(),
         ));
     }
     let linked = call_gxserver_rpc(
@@ -135,7 +135,7 @@ pub(super) fn start_thread(parsed: &ParsedArgs) -> CliResult<()> {
         )
         .map_err(|error| {
             CliError::Other(format!(
-                "Started thread {reference}, but its agent did not start: {error}. Check ghostex coordinator status; do not start another."
+                "Started thread {reference}, but its agent did not start: {error}. Check ghostex orchestrator status; do not start another."
             ))
         })?;
     }
@@ -197,7 +197,7 @@ pub(super) fn start_thread(parsed: &ParsedArgs) -> CliResult<()> {
 
 pub(super) fn link(parsed: &ParsedArgs) -> CliResult<()> {
     let reference = parsed.rest.first().cloned().ok_or_else(|| {
-        CliError::Other("Usage: ghostex coordinator link <session-ref> [--task <text>]".into())
+        CliError::Other("Usage: ghostex orchestrator link <session-ref> [--task <text>]".into())
     })?;
     let (coordinator, _) = target_coordinator(parsed)?;
     let (thread, flags) = resolve_session(&reference, &server_flags(&parsed.flags))?;
@@ -229,7 +229,7 @@ pub(super) fn link(parsed: &ParsedArgs) -> CliResult<()> {
 pub(super) fn set_resolved(parsed: &ParsedArgs, resolved: bool) -> CliResult<()> {
     let verb = if resolved { "resolve" } else { "reopen" };
     let reference = parsed.rest.first().cloned().ok_or_else(|| {
-        CliError::Other(format!("Usage: ghostex coordinator {verb} <thread-ref>"))
+        CliError::Other(format!("Usage: ghostex orchestrator {verb} <thread-ref>"))
     })?;
     let (thread, flags) = resolve_thread_session(&reference, &server_flags(&parsed.flags))?;
     let global_ref = agents::text(&thread, "globalRef").to_string();
@@ -272,7 +272,7 @@ pub(super) fn set_resolved(parsed: &ParsedArgs, resolved: bool) -> CliResult<()>
         print_json(&result);
     } else if close_session {
         println!(
-            "Marked {global_ref} done and closed its session. `ghostex coordinator reopen {global_ref}` or a message resumes the same conversation."
+            "Marked {global_ref} done and closed its session. `ghostex orchestrator reopen {global_ref}` or a message resumes the same conversation."
         );
     } else if resolved {
         println!("Marked {global_ref} done; its session stays open (parked).");

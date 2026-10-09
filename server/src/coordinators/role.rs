@@ -11,6 +11,9 @@ use crate::paths::GxserverPaths;
 ///
 /// CDXC:Coordinators 2026-10-09 DECISION:
 /// User: "If a tool call got rejected with ("STOP and wait") just as a thread report arrives then this is Ghostex's delivery Escape, not the owner pausing your work: retry the tool call and carry on." The playbook's "Waiting means ending your turn" section says so.
+///
+/// CDXC:Coordinators 2026-10-10 DECISION:
+/// User: "let's please rename "Coordinator" to "Orchestrator" everywhere so it's clearer to everyone." The playbook and the guide pointer call the role an orchestrator and name `ghostex orchestrator` verbs; the role file's name on disk and every internal name keep "coordinator".
 pub const COORDINATOR_ROLE_PROMPT: &str = include_str!("role.md");
 
 /// CDXC:Coordinators 2026-10-03 WHY:
@@ -18,7 +21,7 @@ pub const COORDINATOR_ROLE_PROMPT: &str = include_str!("role.md");
 /// system-prompt or config flag a launch command could carry, so both get this short pointer —
 /// Codex inline at launch, ZCode as SessionStart hook context — and read the full playbook from
 /// `ghostex coordinator guide`. Claude is the only family that carries the whole role file.
-pub const GUIDE_POINTER_COORDINATOR_INSTRUCTIONS: &str = "You are a Ghostex coordinator: the user talks only to you, and you hand real work to thread sessions instead of doing it yourself, so you stay free to talk. Before your first reply, and again after any context compaction, run `ghostex coordinator guide` and follow it for the whole session. Run `ghostex coordinator status` at the start of every request.";
+pub const GUIDE_POINTER_COORDINATOR_INSTRUCTIONS: &str = "You are a Ghostex orchestrator: the user talks only to you, and you hand real work to thread sessions instead of doing it yourself, so you stay free to talk. Before your first reply, and again after any context compaction, run `ghostex orchestrator guide` and follow it for the whole session. Run `ghostex orchestrator status` at the start of every request.";
 
 /// Where gxserver keeps the role file Claude coordinators load at launch.
 pub fn coordinator_role_file(paths: &GxserverPaths) -> PathBuf {
@@ -80,7 +83,7 @@ pub fn ensure_empryo_coordinator_agent_file(paths: &GxserverPaths) -> std::io::R
     write_if_changed(
         &path,
         &format!(
-            "---\nname: {EMPRYO_COORDINATOR_AGENT_NAME}\ndescription: The Ghostex coordinator role. Ghostex starts a coordinator session with it; never delegate a task to it.\n---\n\n{}\n",
+            "---\nname: {EMPRYO_COORDINATOR_AGENT_NAME}\ndescription: The Ghostex orchestrator role. Ghostex starts an orchestrator session with it; never delegate a task to it.\n---\n\n{}\n",
             COORDINATOR_ROLE_PROMPT.trim()
         ),
     )?;
@@ -117,7 +120,7 @@ pub fn with_coordinator_role(
         }
         "zcode" | "empryo" => Ok(command.to_string()),
         _ => Err(DomainStateError::bad_request(format!(
-            "A coordinator runs on {COORDINATOR_AGENT_FAMILIES_TEXT}. Pick one of those agents."
+            "An orchestrator runs on {COORDINATOR_AGENT_FAMILIES_TEXT}. Pick one of those agents."
         ))),
     }
 }
