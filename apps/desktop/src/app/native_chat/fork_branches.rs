@@ -25,6 +25,10 @@ pub(super) const FORK_BRANCHES_TRIGGER: &str = "chat-fork-branches";
 /// The button's corner radius before the chat's zoom, shared with its frosted window.
 pub(super) const BADGE_RADIUS: f32 = 6.0;
 
+/// CDXC:SessionFork 2026-10-10 DECISION:
+/// User: "please shift the "this conversation has X branches" button by (24-7) px to the left". The badge sits 27px (10px + 17px) from the pane's right edge, before the chat's zoom, in both its in-pane and frosted-window forms.
+const BADGE_RIGHT_INSET: f32 = 27.0;
+
 /// CDXC:SessionFork 2026-09-23 DECISION:
 /// User: "please make the tooltip for this one appear to the left not to the right (below it) / and show have max width for it's tool tip 220px". The switcher's tooltip opens under the button with its right edge on the button's right edge, so it grows leftward into the pane, and wraps at 220px. React's switcher places it the same way.
 pub(super) const TOOLTIP_PLACEMENT: ManagedTooltipPlacement = ManagedTooltipPlacement::BelowLeft;
@@ -89,7 +93,7 @@ impl NativeChatView {
                 div()
                     .absolute()
                     .top(px(6.0 * s))
-                    .right(px(10.0 * s))
+                    .right(px(BADGE_RIGHT_INSET * s))
                     .h(px(24.0 * s))
                     .px(px(6.0 * s))
                     .flex()
@@ -116,7 +120,7 @@ impl NativeChatView {
                 .absolute()
                 // Clear of the transcript's own 5px scrollbar column at the pane's right edge.
                 .top(px(6.0 * s))
-                .right(px(10.0 * s))
+                .right(px(BADGE_RIGHT_INSET * s))
                 .role(gpui::Role::Button)
                 .aria_label(label)
                 .chat_cursor_pointer()
