@@ -5,6 +5,7 @@
 use super::super::super::super::native_modal_kit::*;
 use super::super::super::fields::{
     SizedButtonSize, SizedButtonVariant, icon, settings_icon, settings_sized_button,
+    wrapped_tooltip_text,
 };
 use super::super::super::palette::SettingsPalette;
 use gpui::prelude::FluentBuilder as _;
@@ -305,6 +306,10 @@ pub(crate) fn grid_card(p: &SettingsPalette, spec: GridCardSpec) -> AnyElement {
         )
         .child(
             div()
+                .id(SharedString::from(format!(
+                    "extension-card-description-{}",
+                    spec.id
+                )))
                 .mt(px(2.0))
                 .w_full()
                 .min_w_0()
@@ -313,6 +318,9 @@ pub(crate) fn grid_card(p: &SettingsPalette, spec: GridCardSpec) -> AnyElement {
                 .text_size(px(13.0))
                 .line_height(px(18.85))
                 .text_color(hsla(p.foreground_alpha(0.75)))
+                .when(!spec.description.is_empty(), |this| {
+                    this.tooltip(wrapped_tooltip_text(spec.description.clone()))
+                })
                 .child(spec.description),
         )
         .children(spec.extra)

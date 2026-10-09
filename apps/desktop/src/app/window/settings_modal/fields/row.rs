@@ -233,6 +233,35 @@ pub(crate) fn tooltip_text(
     move |window, cx| settings_tooltip_bubble(text.clone(), None, None, false, window, cx)
 }
 
+/// The widest a wrapped description tooltip gets, and the room it leaves at the window's edge.
+const WRAPPED_TOOLTIP_MAX_WIDTH: f32 = 320.0;
+const WRAPPED_TOOLTIP_WINDOW_MARGIN: f32 = 24.0;
+/// How far below the pointer a wrapped tooltip starts, past the pointer's arrow (the same drop as
+/// `list_row_tooltip`).
+const WRAPPED_TOOLTIP_DROP: f32 = 20.0;
+
+/// The Settings tooltip for text cut off with an ellipsis (a card's description): the full text
+/// wrapped at a readable width, never wider than the window, dropped below the pointer.
+///
+/// CDXC:Tooltips 2026-10-10 DECISION:
+/// User, of a truncated extension card description: "i can't read the rest of the text here, make hovering over it show tooltip that wraps at sensible spot (not too wide!) with full text". A description cut off by an ellipsis shows its full text on hover, wrapped at about 320px.
+pub(crate) fn wrapped_tooltip_text(
+    text: impl Into<SharedString>,
+) -> impl Fn(&mut Window, &mut gpui::App) -> gpui::AnyView + 'static {
+    let text: SharedString = text.into();
+    move |window, cx| {
+        let room = f32::from(window.viewport_size().width) - WRAPPED_TOOLTIP_WINDOW_MARGIN;
+        settings_tooltip_bubble(
+            text.clone(),
+            Some((ManagedTooltipPlacement::Below, WRAPPED_TOOLTIP_DROP)),
+            Some(WRAPPED_TOOLTIP_MAX_WIDTH.min(room.max(0.0))),
+            false,
+            window,
+            cx,
+        )
+    }
+}
+
 /// A Settings tooltip placed like its React `TooltipContent` (`side`, `sideOffset`), after the
 /// provider's 300ms delay.
 fn placed_tooltip(

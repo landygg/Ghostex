@@ -10,6 +10,7 @@ use super::super::super::super::native_modal_kit::*;
 use super::super::super::fields::{
     card_inset, labeled_switch_control, reorder_handle, reorder_order, reorder_row,
     reorder_scroll_container, settings_icon, settings_section, tooltip_text,
+    wrapped_tooltip_text,
 };
 use super::super::super::model::SettingsTabId;
 use super::super::super::palette::SettingsPalette;
@@ -384,6 +385,7 @@ impl AgentsTab {
                     )
                     .child(
                         div()
+                            .id(SharedString::from(format!("agent-row-subtitle-{agent_id}")))
                             .min_w_0()
                             .overflow_hidden()
                             .whitespace_nowrap()
@@ -392,6 +394,7 @@ impl AgentsTab {
                             .line_height(px(18.5714))
                             .text_color(hsla(p.muted))
                             .when(agent.enabled, |this| this.font_family(MODAL_MONO_FONT))
+                            .tooltip(wrapped_tooltip_text(subtitle.clone()))
                             .child(subtitle),
                     ),
             );
