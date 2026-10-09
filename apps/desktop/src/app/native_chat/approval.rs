@@ -124,7 +124,6 @@ impl NativeChatView {
                 json!({"type":"answer","answer":{"kind":"approval","approvalSend":send}}),
                 busy,
                 false,
-                false,
                 p,
                 cx,
             )

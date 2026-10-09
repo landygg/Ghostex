@@ -127,7 +127,6 @@ impl NativeChatView {
                     "←",
                     json!({"type":"questionBack"}),
                     busy,
-                    true,
                     false,
                     p,
                     cx,
@@ -184,7 +183,6 @@ impl NativeChatView {
                 "Cancel",
                 json!({"type":"questionCancel"}),
                 busy,
-                true,
                 false,
                 p,
                 cx,
@@ -197,7 +195,6 @@ impl NativeChatView {
                 &text(&self.snapshot["questionCard"]["controls"], "label"),
                 json!({"type":"questionNext"}),
                 busy || self.snapshot["questionCard"]["controls"]["disabled"] == true,
-                false,
                 true,
                 p,
                 cx,
@@ -303,13 +300,14 @@ impl NativeChatView {
         ))
     }
 
+    /// CDXC:SessionChat 2026-10-09 DECISION:
+    /// User: "please make the buttons look the same" (no borderless text buttons). Every question, async-question and approval footer button (Back, Cancel, Skip included) draws the control border; the borderless ghost variant is gone here and in the phone's `CardButton` (apps/mobile/app/src/chat/native/cards/primitives.tsx).
     pub(super) fn question_button(
         &self,
         id: &'static str,
         label: &str,
         action: serde_json::Value,
         disabled: bool,
-        ghost: bool,
         wide: bool,
         p: &ChatAppearance,
         cx: &Context<Self>,
@@ -327,11 +325,7 @@ impl NativeChatView {
             .justify_center()
             .rounded(px(8.0 * s))
             .border_1()
-            .border_color(if ghost {
-                gpui::transparent_black()
-            } else {
-                p.control_border
-            })
+            .border_color(p.control_border)
             .text_color(p.foreground)
             .font_weight(gpui::FontWeight::NORMAL)
             .when(wide, |button| button.min_w(px(96.0 * s)))
@@ -341,7 +335,7 @@ impl NativeChatView {
                     .chat_cursor_pointer()
                     .hover(|style| style.bg(p.input))
             })
-            .when(!ghost && p.light, |button| button.bg(p.background))
+            .when(p.light, |button| button.bg(p.background))
             .child(label.to_owned())
             .when(!disabled, |button| {
                 button.on_click(cx.listener(move |this, _, _, cx| this.invoke(action.clone(), cx)))
