@@ -13,17 +13,19 @@
 - **Failed sends fix themselves:** Ghostex redraws a stuck screen, retypes once, or restarts the agent on its own conversation and delivers your message, and shows a card with one Fix it button only when that fails.
 - **A Claude session that quit before its first message starts fresh** instead of failing to resume.
 - **Messages from other agents show their real text,** and Not sent appears only when a send really failed.
+- **Claude Code's internal suggestion queries no longer show up as questions in the chat.**
 - **Sliding a panel no longer rebuilds a long chat every frame,** and the question card's buttons have an outline.
 
 ### 🪟 Windows
 - **Agent hooks no longer time out on Windows** for Claude, Codex, Grok, OpenClaude and OpenCode, thanks to @gvastethecreator.
 - **No more console windows flashing** from anything Ghostex starts in the background.
-- **Window glass uses Windows 11's own blur,** which keeps sliding panels smooth; new installs on Windows still start with glass off.
+- **Window glass uses Windows 11's own blur,** which keeps sliding panels smooth, and menus share the panels' bluish fill; new installs on Windows still start with glass off.
 
 ### 📂 Projects and Files
 - **Add Project's clone shows git's progress,** can be cancelled, never hangs on a password prompt, and starts at your drives on Windows.
 - **Project websites like GitHub, Linear and Jira open straight to the page** instead of a command screen.
 - **Confirm delete in the files list is bold red,** and text buttons in Settings and the Agents Hub have an outline.
+- **The hooks card shows Install all only when needed,** with Uninstall all (now confirmed first) in a ⋯ menu and Refresh as an icon, and long extension descriptions show in full on hover.
 
 ### 📱 Phone
 - **The Android app no longer crashes** and can send to a Windows computer again; Ghostex on the computer also listens where older phone apps look.
