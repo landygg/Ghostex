@@ -114,6 +114,18 @@ const FUNCTION_FILES: &[(&str, &str)] = &[
         "convex/workPage.ts",
         include_str!("../../../packages/team-sync/convex/workPage.ts"),
     ),
+    (
+        "convex/linearKeys.ts",
+        include_str!("../../../packages/team-sync/convex/linearKeys.ts"),
+    ),
+    (
+        "convex/teamFlowSteps.ts",
+        include_str!("../../../packages/team-sync/convex/teamFlowSteps.ts"),
+    ),
+    (
+        "convex/slackGithubIssue.ts",
+        include_str!("../../../packages/team-sync/convex/slackGithubIssue.ts"),
+    ),
     ("convex/devMocks.ts", DEV_MOCKS_STUB),
 ];
 
