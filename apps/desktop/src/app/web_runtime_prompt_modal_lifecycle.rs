@@ -44,6 +44,7 @@ impl GhostexGpuiApp {
                 .map(|extension| extension.title.clone())
                 .filter(|title| !title.trim().is_empty())
                 .unwrap_or_else(|| "This extension".to_string()),
+            GpuiAppModalKind::VisualPage => "This page".to_string(),
             _ => "This window".to_string(),
         };
         match web_runtime_install_prompt(&name) {

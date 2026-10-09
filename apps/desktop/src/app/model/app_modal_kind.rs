@@ -40,6 +40,8 @@ pub(crate) enum GpuiAppModalKind {
     GitFileDiff,
     MermaidDiagram,
     MarkdownTable,
+    /// An agent's published HTML page, floating over the chat (visual_page_modal_lifecycle.rs).
+    VisualPage,
     PortlessSetup,
     Extension(ExtensionId),
     UpdateAvailable,
@@ -92,6 +94,7 @@ impl GpuiAppModalKind {
             "gitFileDiff" => Some(Self::GitFileDiff),
             "mermaidDiagram" => Some(Self::MermaidDiagram),
             "markdownTable" => Some(Self::MarkdownTable),
+            "visualPage" => Some(Self::VisualPage),
             "portlessSetup" => Some(Self::PortlessSetup),
             value if value.starts_with("extension:") => {
                 ExtensionId::new(value.trim_start_matches("extension:")).map(Self::Extension)
@@ -139,6 +142,7 @@ impl GpuiAppModalKind {
             Self::GitFileDiff => "gitFileDiff",
             Self::MermaidDiagram => "mermaidDiagram",
             Self::MarkdownTable => "markdownTable",
+            Self::VisualPage => "visualPage",
             Self::PortlessSetup => "portlessSetup",
             Self::Extension(id) => extension_modal_id(id),
             Self::UpdateAvailable => "updateAvailable",
@@ -181,7 +185,7 @@ impl GpuiAppModalKind {
             Self::SidebarSpaceEditor => "Ghostex Space",
             Self::GitCommit => "Ghostex Commit Changes",
             Self::GitFileDiff => "Ghostex File Diff",
-            Self::MermaidDiagram | Self::MarkdownTable => "",
+            Self::MermaidDiagram | Self::MarkdownTable | Self::VisualPage => "",
             Self::PortlessSetup => "Ghostex Portless Setup",
             Self::Extension(_) => "Ghostex Extension",
             Self::UpdateAvailable => "Ghostex Update",
@@ -369,6 +373,7 @@ impl GpuiAppModalKind {
             // SEE-ALSO: apps/desktop/src/app/window/mermaid_diagram_modal.rs and markdown_table_modal.rs open at this size.
             Self::MermaidDiagram => size(px(1248.0), px(912.0)),
             Self::MarkdownTable => size(px(1248.0), px(912.0)),
+            Self::VisualPage => size(px(1120.0), px(820.0)),
         }
     }
 
@@ -472,6 +477,9 @@ impl GpuiAppModalKind {
             }),
             Self::MermaidDiagram | Self::MarkdownTable => serde_json::json!({
                 "modal": self.modal_id(), "source": "", "type": "open",
+            }),
+            Self::VisualPage => serde_json::json!({
+                "modal": self.modal_id(), "url": "", "type": "open",
             }),
             // A New Coordinator open names its project and a Make Coordinator open its session,
             // which only the sidebar knows.

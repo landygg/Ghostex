@@ -944,13 +944,17 @@ view you can zoom and pan. The web chat shows the diagram's source.
 Agents can show charts, tables, stat tiles, and short text layouts right in the
 chat, drawn in the chat's own colors on desktop, web, and mobile. For things a
 chart can't show, such as a UI mockup or a small interactive tool, the agent
-writes an HTML page and the chat shows a card whose Open button opens the page
-in the browser. Agents do this when you ask for `$ghostex-visuals` in your
+writes an HTML page and the chat shows a card for it. On desktop the card opens
+the page in a floating window over the chat, which closes when you click away
+or press Escape; its header can open the page in your browser instead. A page
+the agent publishes for the browser, and pages on web and mobile, open in the
+browser. Agents do this when you ask for `$ghostex-visuals` in your
 prompt; they never use it on their own. Install the skill from Settings >
 Integrations (Ghostex Visuals) or with `ghostex visual install-skill`. Pages
 open in a sandbox and can't reach your computer's files or Ghostex. Commands:
 `ghostex show <file.html>`
-publishes a page and prints the block that shows its card, and
+publishes a page and prints the block that shows its card (`--browser` opens it
+in the browser instead of floating), and
 `ghostex visual check <file.json>` draws a chart block to an image so the agent
 can check it before replying.
 

@@ -4,7 +4,7 @@ use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
 
 use super::{
     store::{clip_chars, VISUAL_PAGE_MAX_BYTES, VISUAL_PAGE_TITLE_MAX_CHARS},
-    theme::THEME_STYLE,
+    theme::{PAGE_BOOTSTRAP, THEME_STYLE},
 };
 
 const IMAGE_MAX_BYTES: u64 = 10 * 1024 * 1024;
@@ -541,6 +541,7 @@ fn inject_head(html: &str, scan: &DocumentScan) -> String {
     block.push_str(PAGE_CONTENT_SECURITY_POLICY);
     block.push_str("\">");
     block.push_str(THEME_STYLE);
+    block.push_str(PAGE_BOOTSTRAP);
     if !prologue.inside_head && !scan.has_head {
         block = format!("<head>{block}</head>");
     }

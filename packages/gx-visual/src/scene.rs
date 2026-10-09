@@ -102,6 +102,9 @@ pub struct PageRef {
     /// The file the page was published from, which the card names instead of the page's address.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub file: Option<String>,
+    /// The agent marked the page `"open": "popup"`: the card opens it in a floating window over
+    /// the chat, which closes on a click away, instead of in the browser.
+    pub popup: bool,
 }
 
 /// What one block renders to.

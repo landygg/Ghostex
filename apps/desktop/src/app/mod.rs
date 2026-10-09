@@ -57,6 +57,7 @@ pub(crate) mod gx_chat;
 pub(crate) mod gx_store;
 pub(crate) mod keyboard_owner;
 pub(crate) mod markdown_table_modal_lifecycle;
+pub(crate) mod visual_page_modal_lifecycle;
 pub(crate) mod mermaid_diagram_modal_lifecycle;
 pub(crate) mod missing_project_folder_modal_lifecycle;
 pub(crate) mod modals;

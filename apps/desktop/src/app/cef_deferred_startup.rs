@@ -76,6 +76,11 @@ impl GhostexGpuiApp {
         let Some(deferred) = self.app_modal_open_deferred_for_cef.take() else {
             return;
         };
+        // A floating chat page is a native window with its own CEF page, not the extension host.
+        if deferred.modal == GpuiAppModalKind::VisualPage {
+            self.open_gpui_visual_page_modal(&deferred.open_message, cx);
+            return;
+        }
         self.open_gpui_app_modal_window_inner(deferred.modal, deferred.open_message, None, cx);
     }
 }

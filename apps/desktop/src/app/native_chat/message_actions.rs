@@ -49,6 +49,20 @@ impl NativeChatView {
                 .is_some_and(|ids| ids.iter().any(|id| id == &message["id"]))
     }
 
+    /// A turn's final answer with no tool calls of its own: it is drawn flush with the chat column,
+    /// without the reply dot.
+    ///
+    /// CDXC:SessionChat 2026-10-09 DECISION: User: the dot before the agent's last message shifted the whole message right, so "the card for the html mockup" was narrower than the chat box; remove the dot for the agent's final reply. Commentary between tool calls keeps its dot, and an answer with tool calls keeps its chevron.
+    pub(super) fn is_flush_reply(&self, message: &Value) -> bool {
+        message["role"] == "assistant"
+            && !message["tools"]
+                .as_array()
+                .is_some_and(|tools| !tools.is_empty())
+            && self.snapshot["finalIds"]
+                .as_array()
+                .is_some_and(|ids| ids.iter().any(|id| id == &message["id"]))
+    }
+
     pub(super) fn reply_marker(&self, p: &ChatAppearance) -> AnyElement {
         div()
             .relative()
@@ -156,9 +170,15 @@ impl NativeChatView {
                     "chat-actions/save",
                 ))
             });
-        // The prose column: the marker's 2px inset, its 16px slot, and the 6px gap before the text.
+        // The prose column: the marker's 2px inset, its 16px slot, and the 6px gap before the text,
+        // or the column's own edge for an answer drawn without the dot.
+        let prose_column = if self.is_flush_reply(message) {
+            0.0
+        } else {
+            24.0
+        };
         message_actions_row(p, focused)
-            .pl(px(24.0 * p.scale))
+            .pl(px(prose_column * p.scale))
             .tab_group()
             .child(buttons)
             .when_some(message_time(&id, message, p), |row, time| row.child(time))
@@ -201,8 +221,7 @@ impl NativeChatView {
         CDXC:SessionChat 2026-09-19 SEE-ALSO:
         `.ghostex-chat-message-actions` in packages/core-ui/styles/chat.css (deleted 2026-09-25)
         carried the user decision this mirrors: the prompt's actions sit right-aligned below the bubble, led by the time it
-        was sent, in the order Rewind, Save prompt, Copy, so Copy lands at the bubble's edge as in
-        t3code.
+        was sent, in the order Rewind, Save prompt, Copy, so Copy lands at the bubble's edge.
         */
         let button = |key: &str, label: String, icon: &'static str, action: Value| {
             let icon_color = p.muted;

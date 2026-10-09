@@ -685,14 +685,29 @@ impl NativeChatView {
             Some(file) => format!("Interactive HTML page · {file}"),
             None => "Interactive HTML page".to_string(),
         };
+        let floating = page.popup && super::visual_popup::FLOATING_PAGES;
+        let file = page.file.clone();
         let gxv::PageRef { title, url, .. } = page;
+        let page_title = title.clone();
         let open = move |cx: &mut App| {
             let url = url.clone();
             let _ = chat.update(cx, |chat, cx| {
-                chat.invoke(
-                    json!({"type":"openMarkdownLink","href":url,"external":false}),
-                    cx,
-                )
+                // A page marked to float opens over the chat (the app's visual page window);
+                // otherwise where the chat opens every web link.
+                if floating {
+                    cx.emit(super::state::NativeChatEvent::Host(json!({
+                        "type": "open",
+                        "modal": "visualPage",
+                        "url": url,
+                        "title": page_title,
+                        "file": file,
+                    })));
+                } else {
+                    chat.invoke(
+                        json!({"type":"openMarkdownLink","href":url,"external":false}),
+                        cx,
+                    )
+                }
             });
         };
         let open_row = open.clone();

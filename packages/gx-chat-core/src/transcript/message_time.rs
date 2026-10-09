@@ -96,7 +96,7 @@ fn ordinal_suffix(day: u32) -> &'static str {
 }
 
 /// CDXC:SessionChat 2026-09-19 WHY:
-/// The label under a message follows t3code's day-aware timestamp: today `5:48 AM`, yesterday
+/// The label under a message is a day-aware timestamp: today `5:48 AM`, yesterday
 /// `yesterday at 5:48 AM`, older `26/07 5:48 AM`, with the year once it differs; the hover title is
 /// `5:48 AM, 26th July 2026`. Both renderers read the same function so the two transcripts cannot
 /// word a stamp differently.

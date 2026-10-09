@@ -113,10 +113,20 @@ fn parse_page(page: &Value) -> Result<PageRef, String> {
         .map(str::trim)
         .filter(|f| !f.is_empty())
         .map(str::to_string);
+    let popup = match page.get("open").and_then(Value::as_str).map(str::trim) {
+        None | Some("browser") => false,
+        Some("popup") => true,
+        Some(other) => {
+            return Err(format!(
+                "The page's \"open\" is \"popup\" or \"browser\", not {other:?}."
+            ))
+        }
+    };
     Ok(PageRef {
         title: title.to_string(),
         url: url.to_string(),
         file,
+        popup,
     })
 }
 

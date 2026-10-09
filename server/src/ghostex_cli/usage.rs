@@ -221,8 +221,8 @@ pub fn usage() -> String {
             "Post a notification to the Ghostex bell for a session; defaults to the calling session",
         ),
         format_help_command(
-            "show <file.html> [--title text] [--json]",
-            "Publish a self-contained HTML page and print the ```visual block that shows it as a card in the chat",
+            "show <file.html> [--title text] [--browser] [--json]",
+            "Publish a self-contained HTML page and print the ```visual block that shows it as a card in the chat; the card opens it in a floating window over the chat (--browser: in the browser)",
         ),
         format_help_command(
             "visual check <file.json|-> [--width N] [--light] [--out file.png]",

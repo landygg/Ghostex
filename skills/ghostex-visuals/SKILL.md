@@ -171,7 +171,14 @@ For a mockup or a small interactive tool:
    ```
 
 5. Paste the ```visual block it prints into your reply exactly as printed.
-   The chat shows it as a card whose Open button opens the page.
+   The chat shows it as a card for your page. The block carries
+   `"open": "popup"`, the floating mark: clicking the card opens the page in a
+   floating window over the chat (desktop), which closes when the reader
+   clicks away. Leave the mark in for mockups and tools the reader looks at
+   and dismisses. Publish with `--browser` after the file name (or remove the
+   mark) when the page is better read in a full browser tab, such as a long
+   report. Older Ghostex versions print the block without `"open"`: their
+   cards open the page in the browser, and they ignore `--browser`.
 
 If `ghostex show` is an unknown command, say this Ghostex is too old to show
 pages and give the HTML file's path instead.

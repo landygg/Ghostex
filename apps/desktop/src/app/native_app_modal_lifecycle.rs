@@ -212,6 +212,9 @@ impl GhostexGpuiApp {
             GpuiAppModalKind::MarkdownTable => {
                 self.open_gpui_markdown_table_modal(open_message, cx);
             }
+            GpuiAppModalKind::VisualPage => {
+                self.open_gpui_visual_page_modal(open_message, cx);
+            }
             GpuiAppModalKind::MermaidDiagram => {
                 self.open_gpui_mermaid_diagram_modal(open_message, cx);
             }

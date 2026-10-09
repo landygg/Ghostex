@@ -24,9 +24,18 @@ pub fn show_command(args: &[String]) -> CliResult<()> {
         return Ok(());
     }
     let parsed = parse_args(args);
-    let Some(file) = parsed.rest.first() else {
+    // `--browser` takes no value, but the shared parser reads the next word as one when the file
+    // comes after it.
+    let browser_value = parsed
+        .flags
+        .string_value("browser")
+        .filter(|value| !matches!(*value, "true" | "false"))
+        .map(str::to_string);
+    let file = parsed.rest.first().cloned().or(browser_value);
+    let popup = !parsed.flags.contains("browser");
+    let Some(file) = file.as_ref() else {
         return Err(CliError::Other(
-            "show needs an HTML file: ghostex show <file.html> [--title <text>] [--json]"
+            "show needs an HTML file: ghostex show <file.html> [--title <text>] [--browser] [--json]"
                 .to_string(),
         ));
     };
@@ -68,7 +77,7 @@ pub fn show_command(args: &[String]) -> CliResult<()> {
         .file_name()
         .map(|name| name.to_string_lossy().into_owned())
         .unwrap_or_default();
-    let block = visual_page_block(title, &url, &file_name);
+    let block = visual_page_block(title, &url, &file_name, popup);
     if parsed.flags.truthy("json") {
         println!(
             "{{\"ok\":true,\"id\":{},\"title\":{},\"url\":{},\"block\":{}}}",
@@ -79,17 +88,25 @@ pub fn show_command(args: &[String]) -> CliResult<()> {
         );
     } else {
         println!(
-            "Published \"{title}\".\nPut this block in your reply where the page should appear (the chat shows it as a card that opens the page):\n\n{block}"
+            "Published \"{title}\".\nPut this block in your reply where the page should appear (the chat shows it as a card that {}):\n\n{block}",
+            if popup {
+                "opens the page in a floating window over the chat"
+            } else {
+                "opens the page in the browser"
+            }
         );
     }
     Ok(())
 }
 
 /// CDXC:SessionChat 2026-10-06 SEE-ALSO:
-/// The page block `{"page":{"title","url","file"}}` is a contract with the chat's visual parser in packages/gx-visual, which draws it as a card whose Open button opens the URL, and with skills/ghostex-visuals/SKILL.md, which tells agents to paste it exactly as printed.
-fn visual_page_block(title: &str, url: &str, file: &str) -> String {
+/// The page block `{"page":{"title","url","file","open"}}` is a contract with the chat's visual parser in packages/gx-visual, which draws it as a card whose Open button opens the URL, and with skills/ghostex-visuals/SKILL.md, which tells agents to paste it exactly as printed.
+/// CDXC:SessionChat 2026-10-09 DECISION:
+/// User: the agent gives its HTML link "some mark so when we click to open it it's intended to be opened floating", so the agent can show a card for its page in the chat. The mark is `"open": "popup"`, printed by default; `--browser` leaves it out so the card opens the page in the browser instead.
+fn visual_page_block(title: &str, url: &str, file: &str, popup: bool) -> String {
+    let open = if popup { ",\"open\":\"popup\"" } else { "" };
     format!(
-        "```visual\n{{\"page\":{{\"title\":{},\"url\":{},\"file\":{}}}}}\n```",
+        "```visual\n{{\"page\":{{\"title\":{},\"url\":{},\"file\":{}{open}}}}}\n```",
         json_string(title),
         json_string(url),
         json_string(file)

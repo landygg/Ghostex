@@ -483,14 +483,17 @@ impl NativeChatView {
                 let key = format!("tools:{id}");
                 let expanded = tools && self.is_expanded(&key, p.verbose);
                 let motion = self.disclosure_frame(&key, expanded, cx);
+                let flush = self.is_flush_reply(message);
                 let heading = div()
                     .flex()
                     .items_start()
                     .gap(px(6.0 * s))
-                    .child(if tools {
-                        self.disclosure_marker(key.clone(), expanded, p, cx)
-                    } else {
-                        self.reply_marker(p)
+                    .when(!flush, |heading| {
+                        heading.child(if tools {
+                            self.disclosure_marker(key.clone(), expanded, p, cx)
+                        } else {
+                            self.reply_marker(p)
+                        })
                     })
                     .child(div().min_w_0().flex_1().child(self.markdown(
                         format!("body:{id}"),
