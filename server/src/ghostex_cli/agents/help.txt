@@ -128,9 +128,21 @@ DELIVERY
   quotes for text that contains backticks.
 
 READ AND REPLY
+  ghostex read-session-chat <session-ref> --last 2 --format text
   ghostex read-session-chat <session-ref> --limit 20 --json
   ghostex read-text <session-ref> --lines 30
   ghostex read-session-chat-queue <session-ref> --json
+
+  To see what another session is doing, read its conversation, not its
+  screen: read-session-chat --last 2 --format text prints the user's
+  messages, the agent's replies, and each tool call as a one-line summary
+  (no tool output). --last <n> keeps it to the newest rows.
+  read-text shows the terminal screen now; use it only for a stuck prompt,
+  a dialog, or an agent that writes no transcript. Claude Code draws a
+  faint guess at the user's next message in an empty input box: newer
+  versions label it "(faint suggestion from Claude, not typed: the input
+  box is empty)". Never treat it as a typed message or submit it.
+  Results come to you: do not poll or sleep to watch an agent.
 
   Reply with agents send using the sender's Reply to reference.
 

@@ -75,6 +75,20 @@ ghostex orchestrator start-thread --title "<3 to 6 words>" --task "<brief>" [--w
   `Ghostex thread report: your message did not reach it.` Read the thread's chat and send it
   again; if that fails too, tell the user.
 
+## Seeing what a thread is doing
+
+- Read its conversation, not its screen: `ghostex read-session-chat <thread ref> --last 2 --format text`
+  prints the chat the way the chat view shows it: the user's messages, the thread's replies, and each
+  tool call as a one-line summary (no tool output). `--last <n>` keeps it to the newest rows;
+  `--role user`, `--grep "<words>"`, `--since <date or time>` and `--all` narrow or widen it.
+- Read the terminal screen only when the chat cannot answer: `ghostex read-text <thread ref>` shows
+  what the session displays right now (a stuck prompt, a dialog, an agent that writes no
+  transcript). Claude Code draws a faint guess at the user's next message in an empty input box;
+  newer versions label it "(faint suggestion from Claude, not typed: the input box is empty)".
+  Never treat it as a typed message or submit it.
+- Reports come to you: a thread's final message arrives as "Ghostex thread report: …", and other
+  agents message you with `ghostex agents send`. Reading is for checking, never for waiting.
+
 ## Waiting means ending your turn
 
 Never poll, sleep, or run `wait-for-text` to watch a thread. When a thread finishes a turn, Ghostex

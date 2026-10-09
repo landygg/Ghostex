@@ -62,6 +62,29 @@ Ghostex is older, so use the workflow below instead. If you are an orchestrator
 yourself, follow `ghostex orchestrator guide` (older releases:
 `ghostex coordinator guide`) rather than the waiting habits below.
 
+## Check what another session is doing
+
+Read its conversation, not its screen:
+
+```bash
+ghostex read-session-chat <ref> --last 2 --format text
+```
+
+That prints the chat as the chat view shows it: the user's messages, the agent's
+replies, and each tool call as a one-line summary (no tool output). `--last <n>`
+keeps it to the newest rows; `--role user`, `--grep`, `--since` and `--all`
+narrow or widen it (see "Read another thread" below). Reading never wakes a
+sleeping session.
+
+Read the terminal screen only when the chat cannot answer (a stuck prompt, a
+dialog, an agent that writes no transcript): `ghostex read-text <ref>` shows the
+screen now. Claude Code draws a faint guess at the user's next message in an
+empty input box; newer versions label it "(faint suggestion from Claude, not
+typed: the input box is empty)". Never treat it as a typed message or submit it.
+
+Results come to you: ask the agent to `ghostex agents send` its result back (see
+step 7 below). Do not poll or sleep to watch it; end your turn and wait.
+
 ## Core workflow
 
 1. **Know where you are.** Resolve your own session and project from the CLI
