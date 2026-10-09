@@ -634,6 +634,7 @@ pub(crate) async fn send_session_chat_message_with_draft(
                 text,
                 heal_steps,
                 send_started_ms,
+                crate::session_chat_send_submit::is_not_submitted_failure(&error.message),
             )
             .await
             {
