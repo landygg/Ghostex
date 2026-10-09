@@ -356,7 +356,8 @@ impl GhostexGpuiApp {
             .flex()
             .flex_none()
             .items_center()
-            .gap(px(11.0))
+            // CDXC:Docs 2026-10-10 DECISION: User, of the files search field: "reduce gap between icon and text to half" (11px to 5.5px).
+            .gap(px(5.5))
             .h(px(ROW_STRIP_HEIGHT))
             .px(px(10.0))
             .mb(px(4.0))

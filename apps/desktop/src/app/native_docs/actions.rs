@@ -497,6 +497,9 @@ impl GhostexGpuiApp {
                 busy,
                 command(if armed { "confirmDelete" } else { "delete" }),
             );
+            if armed && !running("delete") {
+                menu = menu.destructive();
+            }
         }
         let trigger = Bounds::new(position, gpui::size(px(1.0), px(1.0)));
         self.native_docs_show_menu(menu, trigger, false, window, cx);

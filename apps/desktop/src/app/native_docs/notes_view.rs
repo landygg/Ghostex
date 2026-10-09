@@ -260,7 +260,18 @@ impl GhostexGpuiApp {
             .into_any_element(),
             header_tile(
                 "native-docs-clear",
-                header_icon("files-view/t-trash-2.svg", total == 0, p),
+                // Armed, the trash icon turns the destructive red with its tint, like "Confirm
+                // delete" in the files list (CDXC:ContextMenus 2026-10-10 in context_menu.rs).
+                if clear_armed {
+                    titlebar_svg_icon(
+                        "files-view/t-trash-2.svg",
+                        crate::TITLEBAR_SIDEBAR_COLLAPSE_ICON_SIZE,
+                        danger,
+                    )
+                    .into_any_element()
+                } else {
+                    header_icon("files-view/t-trash-2.svg", total == 0, p)
+                },
                 false,
                 total == 0,
                 p,

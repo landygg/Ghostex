@@ -130,6 +130,17 @@ pub(crate) fn titlebar_popup_menu_foreground() -> Hsla {
     .into()
 }
 
+/// A menu's destructive red: the native modals' `destructive` colour (`ModalPalette`) for the
+/// menu's light or dark theme.
+pub(crate) fn titlebar_popup_menu_destructive() -> Hsla {
+    rgb(if titlebar_uses_light_theme() {
+        0xb91c1c
+    } else {
+        0xf87171
+    })
+    .into()
+}
+
 /// CDXC:Theming 2026-09-23 DECISION:
 /// User: the hovered row of a menu read as a flat grey slab on the tinted menus ("hovered menu item color is ugly"). It is a wash of the menu's own ink instead, so it carries the theme's tint and works on frosted menus too.
 pub(crate) fn titlebar_popup_menu_hover_color() -> Hsla {

@@ -14,6 +14,8 @@ struct ContextMenuRow {
     icon: Option<&'static str>,
     checked: bool,
     disabled: bool,
+    /// Drawn in the destructive red and bold: an armed "Confirm delete" (see `destructive`).
+    destructive: bool,
     action: Box<dyn gpui::Action>,
 }
 
@@ -24,6 +26,7 @@ impl ContextMenuRow {
             icon: self.icon,
             checked: self.checked,
             disabled: self.disabled,
+            destructive: self.destructive,
             action: self.action.boxed_clone(),
         }
     }
@@ -114,6 +117,7 @@ impl GpuiContextMenu {
             icon: None,
             checked: false,
             disabled,
+            destructive: false,
             action,
         }));
         self
@@ -131,8 +135,21 @@ impl GpuiContextMenu {
             icon: Some(icon),
             checked: false,
             disabled,
+            destructive: false,
             action,
         }));
+        self
+    }
+
+    /// Draws the row just added in the destructive red, bold: the armed second step of a
+    /// destructive action ("Confirm delete").
+    ///
+    /// CDXC:ContextMenus 2026-10-10 DECISION:
+    /// User: "please when i click on delete in the files list make confirm delete text show red color text not stay normal color and make it bold so it's noticeable". A menu row asking to confirm a destructive action draws its label and icon in the destructive red the native modals use for their destructive buttons (`titlebar_popup_menu_destructive`), bold, until it is confirmed or the menu closes.
+    pub(crate) fn destructive(mut self) -> Self {
+        if let Some(ContextMenuEntry::Row(row)) = self.entries.last_mut() {
+            row.destructive = true;
+        }
         self
     }
 
@@ -147,6 +164,7 @@ impl GpuiContextMenu {
             icon: None,
             checked,
             disabled: false,
+            destructive: false,
             action,
         }));
         self
@@ -173,6 +191,7 @@ impl GpuiContextMenu {
                         icon: None,
                         checked: false,
                         disabled: false,
+                        destructive: false,
                         action,
                     })
                 })
@@ -338,7 +357,11 @@ impl GpuiContextMenu {
     }
 
     fn row_width(row: &ContextMenuRow, window: &Window, extra: f32) -> f32 {
-        let style = window.text_style();
+        let mut style = window.text_style();
+        // A destructive row draws bold, which runs wider.
+        if row.destructive {
+            style.font_weight = gpui::FontWeight::BOLD;
+        }
         let line = window.text_system().shape_line(
             row.label.clone(),
             px(TITLEBAR_POPUP_MENU_ROW_TEXT_SIZE),
@@ -371,6 +394,7 @@ impl GpuiContextMenu {
                         icon: *icon,
                         checked: false,
                         disabled: false,
+                        destructive: false,
                         action: Box::new(gpui::NoAction {}),
                     },
                     window,
@@ -402,8 +426,14 @@ impl GpuiContextMenu {
         icon: Option<&'static str>,
         disabled: bool,
         chevron: bool,
+        destructive: bool,
     ) -> PopupMenuItem {
         PopupMenuItem::element(move |_, _| {
+            let ink = if destructive {
+                titlebar_popup_menu_destructive()
+            } else {
+                titlebar_popup_menu_foreground()
+            };
             div()
                 .flex()
                 .flex_1()
@@ -412,14 +442,15 @@ impl GpuiContextMenu {
                 .items_center()
                 .min_h(px(TITLEBAR_POPUP_MENU_ROW_HEIGHT))
                 .text_size(px(TITLEBAR_POPUP_MENU_ROW_TEXT_SIZE))
-                .text_color(titlebar_popup_menu_foreground())
+                .text_color(ink)
+                .when(destructive, |row| row.font_weight(gpui::FontWeight::BOLD))
                 .gap(px(8.0))
                 .when(disabled, |row| row.opacity(0.42))
                 .when_some(icon, |row, icon| {
                     row.child(titlebar_svg_icon(
                         icon,
                         TITLEBAR_POPUP_MENU_ROW_ICON_SIZE,
-                        titlebar_popup_menu_foreground(),
+                        ink,
                     ))
                 })
                 // The menu is sized to its widest label, so a label keeps its full width rather
@@ -451,43 +482,50 @@ impl GpuiContextMenu {
         let source_window = self.source_window;
         let source_focus = self.source_focus.clone();
         let app = self.app.clone();
-        Self::row_element(row.label.clone(), row.icon, row.disabled, false)
-            .disabled(row.disabled)
-            .checked(row.checked)
-            .on_click(move |_, _, cx| {
-                let action = action.boxed_clone();
-                let source_focus = source_focus.clone();
-                let app = app.clone();
-                // PopupMenu dismisses after this callback; dispatch afterward so an action
-                // that opens another popup cannot have it closed by this menu's dismissal.
-                cx.defer(move |cx| {
-                    let Some(source_window) = source_window else {
-                        return;
-                    };
-                    let _ = source_window.update(cx, |_, window, cx| {
-                        // Only the window the app itself draws has the handle to fall back to.
-                        let root_focus = app.and_then(|app| app.upgrade()).filter(|app| {
-                            window.root::<Root>().flatten().is_some_and(|root| {
-                                root.read(cx).view().entity_id() == app.entity_id()
-                            })
-                        });
-                        let root_focus =
-                            root_focus.map(|app| app.read(cx).root_action_focus_handle.clone());
-                        let drawn_source_focus = source_focus.filter(|focus| {
-                            root_focus.is_none()
-                                || window.is_action_available_in(action.as_ref(), focus)
-                        });
-                        match (drawn_source_focus, root_focus) {
-                            (Some(focus), _) => {
-                                focus.focus(window, cx);
-                                window.dispatch_action(action, cx);
-                            }
-                            (None, Some(root)) => root.dispatch_action(action.as_ref(), window, cx),
-                            (None, None) => window.dispatch_action(action, cx),
-                        }
+        Self::row_element(
+            row.label.clone(),
+            row.icon,
+            row.disabled,
+            false,
+            row.destructive,
+        )
+        .disabled(row.disabled)
+        .checked(row.checked)
+        .on_click(move |_, _, cx| {
+            let action = action.boxed_clone();
+            let source_focus = source_focus.clone();
+            let app = app.clone();
+            // PopupMenu dismisses after this callback; dispatch afterward so an action
+            // that opens another popup cannot have it closed by this menu's dismissal.
+            cx.defer(move |cx| {
+                let Some(source_window) = source_window else {
+                    return;
+                };
+                let _ = source_window.update(cx, |_, window, cx| {
+                    // Only the window the app itself draws has the handle to fall back to.
+                    let root_focus = app.and_then(|app| app.upgrade()).filter(|app| {
+                        window
+                            .root::<Root>()
+                            .flatten()
+                            .is_some_and(|root| root.read(cx).view().entity_id() == app.entity_id())
                     });
+                    let root_focus =
+                        root_focus.map(|app| app.read(cx).root_action_focus_handle.clone());
+                    let drawn_source_focus = source_focus.filter(|focus| {
+                        root_focus.is_none()
+                            || window.is_action_available_in(action.as_ref(), focus)
+                    });
+                    match (drawn_source_focus, root_focus) {
+                        (Some(focus), _) => {
+                            focus.focus(window, cx);
+                            window.dispatch_action(action, cx);
+                        }
+                        (None, Some(root)) => root.dispatch_action(action.as_ref(), window, cx),
+                        (None, None) => window.dispatch_action(action, cx),
+                    }
                 });
-            })
+            });
+        })
     }
 
     /// A submenu row: picking it reopens this menu where it was, showing the submenu's rows.
@@ -505,7 +543,7 @@ impl GpuiContextMenu {
         let source_focus = self.source_focus.clone();
         let app = self.app.clone();
         let trigger_bounds = self.trigger_bounds;
-        Self::row_element(label.clone(), icon, false, true).on_click(move |_, _, cx| {
+        Self::row_element(label.clone(), icon, false, true, false).on_click(move |_, _, cx| {
             let (Some(source_window), Some(app), Some(trigger_bounds)) = (
                 source_window,
                 app.as_ref().and_then(WeakEntity::upgrade),
@@ -552,7 +590,8 @@ impl GpuiContextMenu {
                 } => {
                     menu = if *disabled {
                         menu.item(
-                            Self::row_element(label.clone(), *icon, true, false).disabled(true),
+                            Self::row_element(label.clone(), *icon, true, false, false)
+                                .disabled(true),
                         )
                     } else {
                         menu.item(self.popup_submenu_item(label, *icon, entries))
