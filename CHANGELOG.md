@@ -10,10 +10,10 @@
 - **Coordinators are now called Orchestrators** across the app, the phone, Help and the CLI; `ghostex orchestrator` is the new command and `ghostex coordinator` still works.
 
 ### 💬 Chat
-- **Failed sends fix themselves:** Ghostex redraws a stuck screen, retypes once, or restarts the agent on its own conversation and delivers your message, and shows a card with one Fix it button only when that fails.
+- **Failed sends fix themselves:** Ghostex redraws a stuck screen, retypes once, or restarts the agent on its own conversation and delivers your message, and shows a card with one Fix it button only when that fails. It never restarts an orchestrator or a session with background work.
 - **A Claude session that quit before its first message starts fresh** instead of failing to resume.
 - **Messages from other agents show their real text,** and Not sent appears only when a send really failed.
-- **Claude Code's internal suggestion queries no longer show up as questions in the chat.**
+- **Claude Code's internal suggestion queries no longer show up as questions in the chat,** and its faint guess at your next message is no longer mistaken for typed text.
 - **Sliding a panel no longer rebuilds a long chat every frame,** and the question card's buttons have an outline.
 
 ### 🪟 Windows
