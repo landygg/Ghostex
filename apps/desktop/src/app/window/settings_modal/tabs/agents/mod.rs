@@ -28,12 +28,14 @@ use super::super::rail::{rail_pages, render_no_matches};
 use super::super::search::should_show_section;
 use super::super::store::{SettingsStore, SettingsStoreEvent};
 use gpui::{
-    AnyView, App, AppContext as _, Context, Entity, FocusHandle, IntoElement, ParentElement as _,
-    Render, SharedString, Styled as _, Window, div,
+    AnyView, App, AppContext as _, Bounds, Context, Entity, FocusHandle, IntoElement,
+    ParentElement as _, Pixels, Render, SharedString, Styled as _, Window, div,
 };
 use gpui_component::input::InputState;
 use serde_json::json;
+use std::cell::Cell;
 use std::collections::{HashMap, HashSet};
+use std::rc::Rc;
 
 /// The icon paths the page draws (Tabler icons in assets/modals/settings/).
 mod icons {
@@ -45,6 +47,7 @@ mod icons {
     pub(super) const COPY: &str = "modals/settings/copy.svg";
     pub(super) const ARROW_BACK_UP: &str = "modals/settings/arrow-back-up.svg";
     pub(super) const SPARKLES: &str = "modals/settings/sparkles.svg";
+    pub(super) const DOTS: &str = "titlebar/dots.svg";
     pub(super) const DOWNLOAD: &str = "modals/settings/download.svg";
     pub(super) const EXTERNAL_LINK: &str = "modals/settings/external-link.svg";
     pub(super) const GRIP_VERTICAL: &str = "modals/settings/grip-vertical.svg";
@@ -106,6 +109,9 @@ pub(crate) struct AgentsTab {
     inline_inputs: HashMap<SharedString, Entity<InputState>>,
     /// "More agents" is open.
     more_agents_open: bool,
+    /// The Session resume hooks card's ⋯ menu is open, and where its trigger was last drawn.
+    hooks_menu_open: bool,
+    hooks_menu_trigger: Rc<Cell<Option<Bounds<Pixels>>>>,
     /// Inline inputs whose text was saved and has not come back from gxserver yet.
     inline_committed: HashMap<SharedString, String>,
     /// The Skip permissions? confirmation is open.
@@ -169,6 +175,8 @@ impl AgentsTab {
             inline_inputs: HashMap::new(),
             inline_committed: HashMap::new(),
             more_agents_open: false,
+            hooks_menu_open: false,
+            hooks_menu_trigger: Rc::new(Cell::new(None)),
             confirming_bypass: false,
             confirm_focus: cx.focus_handle(),
             cli: cli::CliModel::default(),
@@ -202,6 +210,7 @@ impl AgentsTab {
             self.inline_inputs.clear();
             self.inline_committed.clear();
             self.confirming_bypass = false;
+            self.hooks_menu_open = false;
             self.cli_reset();
             self.dropdowns.clear();
             self.last_targeted_section = None;

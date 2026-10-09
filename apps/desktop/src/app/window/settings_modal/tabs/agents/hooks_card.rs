@@ -1,13 +1,14 @@
 //! The Session resume hooks card at the bottom of the Agents page: what hooks do, Install all
-//! (for the agents that are on), Uninstall all, Refresh, the hook state folder, and whether a
-//! hook installs without asking when an agent is turned on.
+//! (for the agents that are on, only while one lacks its hook), a ⋯ menu with Uninstall all, an
+//! icon-only Refresh, the hook state folder, and whether a hook installs without asking when an
+//! agent is turned on.
 //!
 //! CDXC:AgentHooks 2026-10-06 DECISION:
 //! User: "ok implement the plan" for the Agents page redesign. The bulk hook tools leave the top of the agent list for this card at the bottom; the list keeps only a summary line (counting agents that are on) with Fix all. This replaces the 2026-08-28 roster toolbar ("quiet whole-set controls, a readiness chip and an info tooltip"), because a "3/23 hooks ready" count of every supported agent named agents the user never turned on.
 use super::super::super::super::native_modal_kit::*;
 use super::super::super::fields::{
-    ButtonSize, ButtonVariant, RowSpec, card_inset, settings_button_sized, settings_section,
-    toggle_field,
+    ButtonSize, ButtonVariant, RowSpec, card_inset, settings_button_sized, settings_icon,
+    settings_icon_button, settings_section, toggle_field,
 };
 use super::super::super::palette::SettingsPalette;
 use super::super::super::search::{TabSearch, should_show_setting};
@@ -16,7 +17,9 @@ use super::icons;
 use super::model::{HookStatus, any_hook_removable, hook_agent_id};
 use super::turn_on::AUTO_INSTALL_HOOKS;
 use gpui::{
-    AnyElement, Context, Div, ParentElement as _, SharedString, Styled as _, Window, div, px,
+    Anchor, AnchoredPositionMode, AnyElement, Bounds, Context, Div, InteractiveElement as _,
+    IntoElement as _, MouseDownEvent, ParentElement as _, Pixels, SharedString,
+    StatefulInteractiveElement as _, Styled as _, Window, anchored, deferred, div, point, px,
 };
 use gpui_component::{h_flex, v_flex};
 
@@ -69,62 +72,88 @@ impl AgentsTab {
             let loading_reason: SharedString = "Hook status is being checked.".into();
             let removable = any_hook_removable(status.as_ref());
             let install_ids = on_hooks.clone();
-            let buttons = h_flex()
+            // CDXC:Settings 2026-10-10 DECISION:
+            // User: "i dont like 3 buttons next to each other like this. and make the refresh button just refresh icon". The row is [Install all] (only while an agent that is on lacks its hook), a ⋯ menu holding Uninstall all, and an icon-only Refresh.
+            let needs_install = !install_ids.is_empty()
+                && status.as_ref().is_none_or(|status| {
+                    status.error_message.is_some()
+                        || install_ids.iter().any(|hook| {
+                            !status
+                                .item(hook)
+                                .is_some_and(|item| item.status == "installed")
+                        })
+                });
+            let menu_open = self.hooks_menu_open && !loading && removable;
+            let trigger_bounds = self.hooks_menu_trigger.clone();
+            let menu_trigger = div()
+                .flex_shrink_0()
+                .on_children_prepainted(capture_child_bounds(trigger_bounds.clone(), 0))
+                .child(settings_icon_button(
+                    p,
+                    "agents-hooks-more",
+                    icons::DOTS,
+                    16.0,
+                    28.0,
+                    ButtonVariant::Ghost,
+                    Some(if loading {
+                        loading_reason.clone()
+                    } else if !removable {
+                        "No Ghostex hooks are installed.".into()
+                    } else {
+                        "More".into()
+                    }),
+                    loading || !removable,
+                    |page: &mut Self, _window, cx| {
+                        page.hooks_menu_open = !page.hooks_menu_open;
+                        cx.notify();
+                    },
+                    cx,
+                ));
+            let mut buttons = h_flex()
                 .flex_shrink_0()
                 .flex_wrap()
                 .items_center()
                 .justify_end()
-                .gap(px(6.0))
-                .child(settings_button_sized(
+                .gap(px(6.0));
+            if needs_install {
+                buttons = buttons.child(settings_button_sized(
                     p,
                     "agents-hooks-install-all",
                     "Install all",
                     Some(icons::DOWNLOAD),
                     ButtonVariant::Ghost,
                     ButtonSize::Sm,
-                    loading || install_ids.is_empty(),
+                    loading,
                     Some(loading_reason.clone()),
                     move |page: &mut Self, _window, cx| {
                         page.install_hooks(Some(install_ids.clone()), cx);
                         cx.notify();
                     },
                     cx,
-                ))
-                // CDXC:AgentHooks 2026-08-19-11:20 (agents.tsx): Uninstall All sits beside the install it undoes and stays disabled while status loads or no Ghostex hook is present.
-                .child(settings_button_sized(
-                    p,
-                    "agents-hooks-uninstall-all",
-                    "Uninstall all",
-                    Some(icons::TRASH),
-                    ButtonVariant::Ghost,
-                    ButtonSize::Sm,
-                    loading || !removable,
-                    Some(if loading {
-                        loading_reason.clone()
-                    } else {
-                        "No Ghostex hooks are installed.".into()
-                    }),
-                    |page: &mut Self, _window, cx| {
-                        page.uninstall_hooks(None, cx);
-                        cx.notify();
-                    },
-                    cx,
-                ))
-                .child(settings_button_sized(
-                    p,
-                    "agents-hooks-refresh",
-                    "Refresh",
-                    Some(icons::REFRESH),
-                    ButtonVariant::Ghost,
-                    ButtonSize::Sm,
-                    loading,
-                    Some(loading_reason),
-                    |page: &mut Self, _window, cx| {
-                        page.request_hook_status(cx);
-                        cx.notify();
-                    },
-                    cx,
                 ));
+            }
+            buttons = buttons.child(menu_trigger).child(settings_icon_button(
+                p,
+                "agents-hooks-refresh",
+                icons::REFRESH,
+                16.0,
+                28.0,
+                ButtonVariant::Ghost,
+                Some(if loading {
+                    loading_reason
+                } else {
+                    "Refresh".into()
+                }),
+                loading,
+                |page: &mut Self, _window, cx| {
+                    page.request_hook_status(cx);
+                    cx.notify();
+                },
+                cx,
+            ));
+            if menu_open && let Some(bounds) = trigger_bounds.get() {
+                buttons = buttons.child(self.hooks_menu_popup(p, bounds, cx));
+            }
             let small = |text: String| {
                 div()
                     .min_w_0()
@@ -189,5 +218,74 @@ impl AgentsTab {
             ));
         }
         settings_section(p, "Session resume hooks", None, None, rows)
+    }
+
+    /// The ⋯ menu under its trigger: one row, Uninstall all.
+    fn hooks_menu_popup(
+        &mut self,
+        p: &SettingsPalette,
+        trigger: Bounds<Pixels>,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        let p = *p;
+        let hover = p.popup_hover;
+        let row = h_flex()
+            .id("agents-hooks-uninstall-all")
+            .role(gpui::Role::MenuItem)
+            .aria_label(SharedString::from("Uninstall all"))
+            .w_full()
+            .min_h(px(32.0))
+            .px(px(8.0))
+            .py(px(6.0))
+            .gap(px(8.0))
+            .items_center()
+            .rounded(px(6.0))
+            .text_size(px(14.0))
+            .line_height(px(20.0))
+            .text_color(hsla(p.foreground))
+            .cursor_pointer()
+            .hover(move |this| this.bg(hsla(hover)))
+            .on_press(cx, |page, _window, cx| {
+                page.hooks_menu_open = false;
+                page.uninstall_hooks(None, cx);
+                cx.notify();
+            })
+            .child(settings_icon(icons::TRASH, 16.0, p.foreground))
+            .child("Uninstall all");
+        deferred(
+            anchored()
+                .position_mode(AnchoredPositionMode::Window)
+                .anchor(Anchor::TopRight)
+                .position(point(
+                    trigger.origin.x + trigger.size.width,
+                    trigger.origin.y + trigger.size.height + px(4.0),
+                ))
+                .snap_to_window_with_margin(px(8.0))
+                .child(
+                    v_flex()
+                        .id("agents-hooks-menu")
+                        .occlude()
+                        .w(px(176.0))
+                        .p(px(4.0))
+                        .rounded(px(MODAL_RADIUS_CONTROL))
+                        .border_1()
+                        .border_color(hsla(p.popup_border))
+                        .bg(hsla(p.popup_background))
+                        .shadow_md()
+                        .font_family(MODAL_UI_FONT)
+                        .on_mouse_down_out(cx.listener(
+                            move |page, event: &MouseDownEvent, _window, cx| {
+                                if trigger.contains(&event.position) {
+                                    return;
+                                }
+                                page.hooks_menu_open = false;
+                                cx.notify();
+                            },
+                        ))
+                        .child(row),
+                ),
+        )
+        .with_priority(1)
+        .into_any_element()
     }
 }
