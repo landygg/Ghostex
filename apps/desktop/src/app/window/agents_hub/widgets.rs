@@ -103,6 +103,11 @@ pub(crate) fn hub_button<V: 'static>(
     on_click: impl Fn(&mut V, &mut Window, &mut Context<V>) + 'static,
     cx: &mut Context<V>,
 ) -> Stateful<Div> {
+    // A labelled button always draws the outline (CDXC:AppModal 2026-10-09 on `settings_button_sized`).
+    let variant = match variant {
+        HubButtonVariant::Ghost if label.is_some() => HubButtonVariant::Outline,
+        other => other,
+    };
     let skin = hub_button_skin(hp, variant);
     let (height, padding_x, gap, icon_size) = match size {
         HubButtonSize::Default => (

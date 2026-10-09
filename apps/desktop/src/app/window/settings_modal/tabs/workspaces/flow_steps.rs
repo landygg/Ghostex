@@ -706,7 +706,7 @@ impl WorkspacesTab {
         setting_row(
             p,
             format!("flow-steps-save-row-{workspace_id}"),
-            RowSpec::new("Save").readout(readout).description(status),
+            RowSpec::new("Steps in use").readout(readout).description(status),
             None,
             control.into_any_element(),
             cx,

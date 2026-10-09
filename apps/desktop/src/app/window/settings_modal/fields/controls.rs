@@ -261,6 +261,9 @@ pub(crate) fn settings_button<V: 'static>(
 
 /// `settings_button` at a shadcn size (`sm` 28px, `xs` 24px; `data-icon='inline-start'` trims
 /// the leading side by 2px).
+///
+/// CDXC:AppModal 2026-10-09 DECISION:
+/// User: "why does this "Save" button (and other buttons in the app in settings and other places) not have an outline? I dont like this please make the buttons look the same." A button with a text label always draws the outline: `Ghost` renders as `Outline` here and in the Agents Hub's `hub_button`. Borderless ghost stays only for icon-only buttons (`settings_icon_button`, the modal corner X), menu rows, links inside running text, segmented controls and switches.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn settings_button_sized<V: 'static>(
     p: &SettingsPalette,
@@ -274,6 +277,10 @@ pub(crate) fn settings_button_sized<V: 'static>(
     on_click: impl Fn(&mut V, &mut Window, &mut Context<V>) + 'static,
     cx: &mut Context<V>,
 ) -> AnyElement {
+    let variant = match variant {
+        ButtonVariant::Ghost => ButtonVariant::Outline,
+        other => other,
+    };
     let (background, border, hover) = button_colors(p, variant);
     let primary = variant == ButtonVariant::Primary;
     let text = button_text(p, variant);
