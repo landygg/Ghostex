@@ -132,8 +132,15 @@ pub fn fetch_live_gxserver_session_list(flags: &Flags) -> CliResult<Value> {
      * here and every consumer — mobile, TUI, `--json` — sees the same icon
      * chain the gpui sidebar ranks.
      */
-    let discovered_project_icons =
-        presentation_project_icon_map(snapshot.and_then(|snapshot| snapshot.get("projects")));
+    let discovered_project_icons = presentation_project_field_map(
+        snapshot.and_then(|snapshot| snapshot.get("projects")),
+        "discoveredIconDataUrl",
+    );
+    // CDXC:WorkMode 2026-10-09 WHY: a work-mode project's primary tracker is remembered only in gxserver's memory by its background pass, so it is folded in from the snapshot the same way; the phone picks the GitHub or Linear rows of Link to from it.
+    let project_work_trackers = presentation_project_field_map(
+        snapshot.and_then(|snapshot| snapshot.get("projects")),
+        "workTracker",
+    );
     result.insert(
         "projects".to_string(),
         Value::Array(
@@ -141,11 +148,22 @@ pub fn fetch_live_gxserver_session_list(flags: &Flags) -> CliResult<Value> {
                 .iter()
                 .map(|project| {
                     let mut merged = (*project).clone();
-                    let discovered = value_key(project.get("projectId"))
-                        .and_then(|project_id| discovered_project_icons.get(&project_id))
+                    let project_id = value_key(project.get("projectId"));
+                    let discovered = project_id
+                        .as_ref()
+                        .and_then(|project_id| discovered_project_icons.get(project_id))
                         .map(|value| (*value).clone());
-                    if let (Some(map), Some(discovered)) = (merged.as_object_mut(), discovered) {
-                        map.insert("discoveredIconDataUrl".to_string(), discovered);
+                    let work_tracker = project_id
+                        .as_ref()
+                        .and_then(|project_id| project_work_trackers.get(project_id))
+                        .map(|value| (*value).clone());
+                    if let Some(map) = merged.as_object_mut() {
+                        if let Some(discovered) = discovered {
+                            map.insert("discoveredIconDataUrl".to_string(), discovered);
+                        }
+                        if let Some(work_tracker) = work_tracker {
+                            map.insert("workTracker".to_string(), work_tracker);
+                        }
                     }
                     merged
                 })
@@ -237,18 +255,21 @@ pub fn fetch_live_gxserver_session_list(flags: &Flags) -> CliResult<Value> {
     Ok(Value::Object(result))
 }
 
-/// `discoveredIconDataUrl` per projectId from the daemon's presentation
-/// snapshot. Projects the icon pass has not reached publish no key at all, so
-/// they are simply absent from the map.
-fn presentation_project_icon_map(projects: Option<&Value>) -> HashMap<String, &Value> {
+/// One key (`discoveredIconDataUrl`, `workTracker`) per projectId from the
+/// daemon's presentation snapshot. Projects that publish no such key (the icon
+/// pass has not reached them, work mode is off) are simply absent from the map.
+fn presentation_project_field_map<'a>(
+    projects: Option<&'a Value>,
+    key: &str,
+) -> HashMap<String, &'a Value> {
     let mut map = HashMap::new();
     if let Some(list) = projects.and_then(Value::as_array) {
         for project in list {
             let Some(project_id) = value_key(project.get("projectId")) else {
                 continue;
             };
-            if let Some(icon) = project.get("discoveredIconDataUrl") {
-                map.insert(project_id, icon);
+            if let Some(value) = project.get(key) {
+                map.insert(project_id, value);
             }
         }
     }

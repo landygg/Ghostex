@@ -177,6 +177,12 @@ pub(super) fn to_mobile_session_list(result: &Value) -> Value {
                         // CDXC:WorkMode 2026-10-09 WHY: the phone's project menu ticks its Work Mode row from this; the inventory rows are raw project rows, so the switch is read with the same rule the presentation snapshot uses and sent only when true, like the snapshot's own `workMode`.
                         if crate::work_mode::project_work_mode(project) {
                             project_map.insert("workMode".to_string(), json!(true));
+                            // The workspace's primary tracker (`linear` or `github`), which picks the phone's Link to rows.
+                            insert_present(
+                                &mut project_map,
+                                "workTracker",
+                                project.get("workTracker"),
+                            );
                         }
                         // CDXC:Workspaces 2026-10-09 SEE-ALSO: the phone filters by these exactly as gx-core `WindowWorkspace::shows_project` does (apps/mobile/app/src/workspaces/workspaceFilter.ts); sent under the presentation snapshot's own keys and rules.
                         if crate::workspaces::workspaces_feature_enabled() {

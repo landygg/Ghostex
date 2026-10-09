@@ -363,7 +363,8 @@ you work for and a Personal one. Workspaces is a built-in extension, off by
 default: turn it on with its switch in Settings > Extensions (Features). It also
 brings work mode, the Work view and the team backend (see Git and worktrees).
 While it is off there is no workspace button, every window shows every project,
-and the `ghostex workspace`, `work-mode`, `link-session`, `team` and `slack`
+the project menu (on the computer and on the phone) has no Work Mode row, and the
+`ghostex workspace`, `work-mode`, `link-session`, `team` and `slack`
 commands say it is turned off; your workspaces, links, Linear keys and team
 connections are kept and come back when you turn it on (`workspacesHidden`).
 Each workspace has its own projects, Spaces,
@@ -2261,11 +2262,12 @@ missing). From a terminal, `ghostex link-session
 <session> --pr 6538 --linear SPX-1245 --issue 218` does the same and `--auto`
 goes back to what the branch says; `--candidates linearIssue --query text` (or
 `pullRequest`, `linearProject`, `githubIssue`, `githubProject`) lists what the Link
-to list would suggest. The phone's session menu has the same Link to. When a linked PR is merged, its card offers
+to list would suggest. The phone's session menu has the same Link to, with the
+GitHub rows in a workspace whose primary tracker is GitHub. When a linked PR is merged, its card offers
 Clean up (remove the session's worktree and park the session; a worktree with
 uncommitted changes is kept) or Keep, once per PR; `ghostex work-mode cleanup
 <session> clean-up|keep` answers it from a terminal. The phone's session list
-shows the same second line: tap a chip to open it in the browser, touch and hold
+shows the same second line (the GitHub Project chip included): tap a chip to open it in the browser, touch and hold
 it to copy its link, and tap Clean up or Keep to answer. A
 session on a branch other than main is titled by that branch, without your name
 and the ticket ID, until you rename it. Linear status needs a Linear API key: set
