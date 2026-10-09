@@ -487,7 +487,12 @@ pub async fn deliver_session_chat_queued_prompt(
     let db = open_gxserver_database(paths).map_err(internal_error)?;
     let mut held = false;
     let error_message = match outcome {
-        Err(error) if hold_when_composer_missing && error.code == "composerNotReady" => {
+        // A delivery that restarted the agent made this row a startup send; it waits for the new
+        // input box whichever caller delivered it.
+        Err(error)
+            if (hold_when_composer_missing && error.code == "composerNotReady")
+                || error.code == crate::session_chat_send_wake::SESSION_CHAT_SESSION_STARTING =>
+        {
             db.execute(
                 r#"
                 UPDATE session_chat_queued_prompts
@@ -1180,6 +1185,27 @@ fn claim_prompt(
         ));
     }
     Ok(prompt.text)
+}
+
+/// Turns the row this session is delivering into a startup send, so it waits for the input box of
+/// the agent the failed delivery just restarted (session_chat_queue_runtime/send_heal.rs) instead
+/// of failing. False when no row is being delivered.
+pub(crate) fn hold_sending_prompt_for_restart(
+    paths: &GxserverPaths,
+    project_id: &str,
+    session_id: &str,
+) -> bool {
+    open_gxserver_database(paths).is_ok_and(|db| {
+        db.execute(
+            r#"
+            UPDATE session_chat_queued_prompts
+            SET startupSend = 1
+            WHERE projectId = ?1 AND sessionId = ?2 AND state = 'sending'
+            "#,
+            params![project_id, session_id],
+        )
+        .is_ok_and(|changed| changed > 0)
+    })
 }
 
 fn fail_prompt(

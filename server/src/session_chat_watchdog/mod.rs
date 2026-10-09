@@ -64,7 +64,7 @@ use crate::session_chat_notice::{
     session_chat_screen_shows_queued_input, session_chat_terminal_screen_tail,
     session_chat_watchdog_notice, set_session_chat_watchdog_notice, SessionChatTerminalNotice,
     SessionChatTerminalNoticeAction, SessionChatTerminalNoticeSeverity,
-    SessionChatTerminalNoticeSource, SESSION_CHAT_NOTICE_AGENT_EXITED,
+    SessionChatTerminalNoticeSource,
     SESSION_CHAT_NOTICE_DELIVERY_FAILED, SESSION_CHAT_NOTICE_QUEUED_INPUT,
 };
 use crate::session_chat_options::session_chat_option_agent;

@@ -35,6 +35,7 @@ pub(super) async fn run_session_chat_send_watchdog(
     publish: SessionChatWatchdogPublisher,
     read_state: SessionChatWatchdogStateReader,
     returned_prompt: SessionChatReturnedPromptTrigger,
+    heal: SessionChatSendHealer,
     generation: Arc<AtomicU64>,
     my_generation: u64,
 ) {
@@ -159,8 +160,15 @@ pub(super) async fn run_session_chat_send_watchdog(
                 }
             }
         }
-        escalate_undelivered_send(&probe, cursor.path.is_some(), &publish, &read_state, reason)
-            .await;
+        escalate_undelivered_send(
+            &probe,
+            cursor.path.is_some(),
+            &publish,
+            &read_state,
+            Some(&heal),
+            reason,
+        )
+        .await;
         published_kind = session_chat_watchdog_notice(&probe.project_id, &probe.session_id)
             .map(|notice| notice.kind)
             .filter(|kind| {
@@ -238,6 +246,7 @@ pub(super) async fn escalate_undelivered_send(
     transcript_watched: bool,
     publish: &SessionChatWatchdogPublisher,
     read_state: &SessionChatWatchdogStateReader,
+    heal: Option<&SessionChatSendHealer>,
     reason: UndeliveredSendReason,
 ) {
     /*
@@ -325,27 +334,32 @@ pub(super) async fn escalate_undelivered_send(
     let live = tokio::task::spawn_blocking(move || reader())
         .await
         .unwrap_or_default();
-    if live.running
+    /*
+    CDXC:SessionChat 2026-10-09 WHY:
+    Claude's session registry alone used to decide "exited", and it was wrong twice on 2026-10-09: a cswap account keeps its records in its own folder, and on Windows a pid cannot be checked at all, so a Claude that was running got "Claude Code is no longer running in this terminal". The session's own process tree (the snapshot account switching already trusts) now has to agree before anything is called exited, and an exited agent is restarted on its own conversation with the message held for it (the 2026-10-09 DECISION in session_chat_queue_runtime/send_heal.rs) instead of being reported.
+    */
+    let agent_exited = live.running
         && probe_claude_agent_liveness(probe.agent.as_deref(), probe.agent_session_id.as_deref())
             == ClaudeAgentLiveness::Exited
-    {
+        && !crate::session_chat_send::session_agent_process_running(
+            &probe.zmx_name,
+            &crate::resume_lookup::home_dir(),
+        )
+        .await;
+    if agent_exited {
+        if let Some(heal) = heal.filter(|_| typed_into_terminal) {
+            if heal().await {
+                if clear_session_chat_watchdog_notice(&probe.project_id, &probe.session_id)
+                    .is_some()
+                {
+                    publish();
+                }
+                return;
+            }
+        }
         publish_watchdog_notice(
             probe,
-            SessionChatTerminalNotice::new(
-                SESSION_CHAT_NOTICE_AGENT_EXITED,
-                SessionChatTerminalNoticeSeverity::Error,
-                SessionChatTerminalNoticeSource::Watchdog,
-                "Claude Code is no longer running in this terminal",
-            )
-            .with_detail(match reason {
-                UndeliveredSendReason::TranscriptSilent => "Your message was never recorded, and the Claude Code process that owned this session is no longer registered as running; it appears to have exited. Start it again in the terminal before sending more messages.",
-                UndeliveredSendReason::MismatchedInput { .. } => "Your message was not recorded. A different prompt was submitted in its place, and the Claude Code process that owned this session is no longer registered as running. Start it again in the terminal before sending more messages.",
-                UndeliveredSendReason::WriteFailed(_) => "Your message could not be sent to this session, and the Claude Code process that owned it is no longer registered as running; it appears to have exited. Start it again in the terminal before sending more messages.",
-            })
-            .with_screen_tail(screen_tail)
-            .with_actions(vec![SessionChatTerminalNoticeAction::switch_to_terminal(
-                "Open terminal",
-            )]),
+            crate::session_chat_notice::session_chat_send_recovery_failed_notice(true, screen_tail),
             publish,
         );
         return;
@@ -436,17 +450,17 @@ pub(super) async fn escalate_undelivered_send(
         .with_actions(vec![SessionChatTerminalNoticeAction::switch_to_terminal(
             "Open terminal",
         )]),
-        UndeliveredSendReason::WriteFailed(failure) => SessionChatTerminalNotice::new(
-            SESSION_CHAT_NOTICE_DELIVERY_FAILED,
-            SessionChatTerminalNoticeSeverity::Error,
-            SessionChatTerminalNoticeSource::Watchdog,
-            "Your message could not be sent to the agent",
-        )
-        .with_detail(failure.detail())
-        .with_screen_tail(screen_tail)
-        .with_actions(vec![SessionChatTerminalNoticeAction::switch_to_terminal(
-            "Open terminal",
-        )]),
+        // The send path already tried to recover this one (session_chat_queue_runtime/send_heal.rs).
+        UndeliveredSendReason::WriteFailed(failure) => {
+            crate::session_chat_send_diagnostics::record_send_recovery_from_worker(
+                "sessionChatSendFailedStep",
+                &probe.project_id,
+                &probe.session_id,
+                failure.detail(),
+                &[],
+            );
+            crate::session_chat_notice::session_chat_send_recovery_failed_notice(false, screen_tail)
+        }
     };
     publish_watchdog_notice(probe, notice, publish);
 }

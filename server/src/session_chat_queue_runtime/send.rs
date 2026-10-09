@@ -43,7 +43,7 @@ pub(crate) async fn send_session_chat_message_internal(
 /// How much longer a send keeps watching the input box for a paste the first check missed.
 const LATE_PASTE_WATCH_MS: u64 = 6_000;
 /// The paste check of the one clear-and-retype attempt.
-const PASTE_RETRY_WATCH_MS: u64 = 6_000;
+pub(super) const PASTE_RETRY_WATCH_MS: u64 = 6_000;
 
 /// CDXC:SessionChat 2026-10-04 WHY:
 /// "The terminal did not accept the pasted message" is decided before Return is written, so nothing was submitted, and under load it is usually a paste that lands late, not one that was lost: on Windows a 561-byte message gets a 2-second check, and a coordinator's sends failed right after a gxserver restart and while a release build ran, then went through unchanged a minute later. The diagnostics of the 07:03 failure show the first retry here (a fixed 1.5 s pause, then the whole send again) pressing Ctrl+C on the first paste, which had arrived by then, and its second paste missing the same 2-second window. So the send first keeps watching the input box and submits the first paste when it shows up; only when it never does is the box cleared (the send's own verified clear) and the message typed once more, with a longer check. Not for image or slash-command sends, whose steps do more than type text.
@@ -90,7 +90,7 @@ fn late_paste_steps(
     Some(late)
 }
 
-fn with_paste_watch_of_at_least(
+pub(super) fn with_paste_watch_of_at_least(
     mut steps: Vec<crate::session_chat_send::SessionChatSendStep>,
     watch_ms: u64,
 ) -> Vec<crate::session_chat_send::SessionChatSendStep> {
@@ -107,7 +107,7 @@ fn with_paste_watch_of_at_least(
 
 /// The retype's steps with `KeepSinglePaste` after its paste check, for an agent whose input box
 /// the send reads and whose verified clear sends no keys to an empty box.
-fn with_single_paste_guard(
+pub(super) fn with_single_paste_guard(
     mut steps: Vec<crate::session_chat_send::SessionChatSendStep>,
     agent: Option<&str>,
 ) -> Vec<crate::session_chat_send::SessionChatSendStep> {
@@ -135,7 +135,7 @@ fn with_single_paste_guard(
 
 /// CDXC:SessionChat 2026-10-05 WHY:
 /// The clear-and-retype attempt only runs when two paste checks found no message in the input box, so nothing was submitted; but an agent that takes a paste without the Return (or a screen read that missed a submitted turn) would get the message twice from it. The retype first asks the agent's transcript whether a user turn since this send already carries the message, and settles the send as delivered when it does.
-async fn paste_already_recorded(session: &Value, text: &str, since_ms: i64) -> bool {
+pub(super) async fn paste_already_recorded(session: &Value, text: &str, since_ms: i64) -> bool {
     let needles = crate::coordinators::delivery_needles(text);
     let session = session.clone();
     tokio::task::spawn_blocking(move || {
@@ -426,6 +426,18 @@ pub(crate) async fn send_session_chat_message_with_draft(
     carries a code and a message and nothing else, at 169 construction sites);
     clients read it from /api/readSessionTerminalTail instead.
     */
+    if let Some(held) = restart_exited_agent_before_send(
+        state,
+        &target,
+        &detection,
+        terminal_agent.as_deref(),
+        source,
+        drafted_text,
+    )
+    .await
+    {
+        return held;
+    }
     let redraw_claude_composer = detection.prompt.is_none()
         && !detection
             .notice
@@ -547,6 +559,7 @@ pub(crate) async fn send_session_chat_message_with_draft(
         image_paths,
     );
     let retry_steps = (image_paths.is_empty() && !capture_local_output).then(|| steps.clone());
+    let heal_steps = retry_steps.clone();
     let send_started_ms = chrono::Utc::now().timestamp_millis();
     let mut sent = crate::session_chat_send::execute_session_chat_send(
         &target.project_id,
@@ -610,6 +623,35 @@ pub(crate) async fn send_session_chat_message_with_draft(
                 .await;
             }
         }
+    }
+    let mut agent_restarting = false;
+    if let (Err(error), Some(heal_steps)) = (&sent, heal_steps) {
+        if heals_refused_send(error, source, terminal_agent.as_deref()) {
+            match super::send_heal::heal_refused_send(
+                state,
+                &target,
+                terminal_agent.as_deref(),
+                text,
+                heal_steps,
+                send_started_ms,
+            )
+            .await
+            {
+                super::send_heal::SendHeal::Delivered => sent = Ok(()),
+                super::send_heal::SendHeal::Restarting => agent_restarting = true,
+                super::send_heal::SendHeal::GaveUp => {}
+            }
+        }
+    }
+    if agent_restarting {
+        if let Some(id) = durable_id.as_deref() {
+            crate::session_chat_app_command::discard_local_command(
+                &target.project_id,
+                &target.session_id,
+                id,
+            );
+        }
+        return hold_for_restarted_agent(state, &target, source, drafted_text);
     }
     if let Err(error) = sent {
         if let Some(id) = durable_id.as_deref() {
@@ -720,6 +762,7 @@ pub(crate) async fn send_session_chat_message_with_draft(
                     "session-chat-watchdog",
                 );
             }),
+            exited_agent_healer(state, &target, drafted_text),
         );
     }
     /*

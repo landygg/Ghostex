@@ -88,10 +88,12 @@ mod endpoints;
 mod post_send;
 mod scheduler;
 mod send;
+mod send_heal;
 mod wiring;
 
 pub(crate) use endpoints::*;
 pub(crate) use post_send::*;
 pub use scheduler::*;
 pub(crate) use send::*;
+pub(crate) use send_heal::*;
 pub(crate) use wiring::*;

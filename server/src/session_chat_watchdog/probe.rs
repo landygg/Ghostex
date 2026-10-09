@@ -53,6 +53,13 @@ pub type SessionChatWatchdogStateReader =
 /// Claude's composer (CDXC:SessionChat in session_chat_returned_prompt.rs).
 pub type SessionChatReturnedPromptTrigger = Arc<dyn Fn() + Send + Sync>;
 
+/// Restarts a session whose agent exited under a send and holds the message for the new agent
+/// (session_chat_queue_runtime/send_heal.rs); resolves to whether it did. Supplied by the send
+/// path, which owns the AppState a restart needs.
+pub type SessionChatSendHealer = Arc<
+    dyn Fn() -> std::pin::Pin<Box<dyn std::future::Future<Output = bool> + Send>> + Send + Sync,
+>;
+
 // ---------------------------------------------------------------------------
 // Send probe
 // ---------------------------------------------------------------------------
@@ -196,6 +203,7 @@ pub fn start_session_chat_send_watchdog(
     publish: SessionChatWatchdogPublisher,
     read_state: SessionChatWatchdogStateReader,
     returned_prompt: SessionChatReturnedPromptTrigger,
+    heal: SessionChatSendHealer,
 ) {
     let probe = Arc::new(probe);
     let (project_id, session_id) = (probe.project_id.clone(), probe.session_id.clone());
@@ -208,6 +216,7 @@ pub fn start_session_chat_send_watchdog(
                 publish,
                 read_state,
                 returned_prompt,
+                heal,
                 generation,
                 my_generation,
             ))
@@ -215,9 +224,9 @@ pub fn start_session_chat_send_watchdog(
     );
 }
 
-/// Which step of a refused send failed; the delivery card names it.
+/// Which step of a refused send failed; the send-failure log names it.
 /// CDXC:AgentScreenDetection 2026-10-09 WHY:
-/// Every refused write used to share one card, "This session's terminal did not respond while the message was being typed into it". On one Windows machine all five of those cards (2026-10-04..07) were a paste that never showed in the input box (or Codex keeping a submitted message), with the terminal answering normally the whole time, and a 10.16.0 user reading it on macOS found "nothing special" in the terminal. The card says what actually failed so the next report names the step.
+/// Every refused write used to share one card, "This session's terminal did not respond while the message was being typed into it". On one Windows machine all five of those cards (2026-10-04..07) were a paste that never showed in the input box (or Codex keeping a submitted message), with the terminal answering normally the whole time, and a 10.16.0 user reading it on macOS found "nothing special" in the terminal. The send-failure log says what actually failed so the next report names the step; the card itself is the plain Fix it card since the 2026-10-09 send recovery (session_chat_queue_runtime/send_heal.rs).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SendWriteFailure {
     /// The terminal refused the bytes or the input handshake never completed.
@@ -276,6 +285,7 @@ pub fn escalate_failed_session_chat_send(
                     probe.transcript_path.is_some(),
                     &publish,
                     &read_state,
+                    None,
                     UndeliveredSendReason::WriteFailed(failure),
                 )
                 .await;

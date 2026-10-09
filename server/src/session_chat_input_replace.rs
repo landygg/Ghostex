@@ -37,6 +37,23 @@ fn composer_clear_method(agent: &str) -> Option<ComposerClearMethod> {
 /// Empryo's attached images survive Ctrl+U and Backspace; only its Ctrl+C clear drops them, and only while the box holds text (Ctrl+C on an empty box quits Empryo). So a box holding just images first gets this one character, and Ctrl+C follows once a capture shows it typed.
 const EMPRYO_ATTACHMENT_SEED: &str = "x";
 
+/// CDXC:SessionChat 2026-10-09 WHY:
+/// The 2026-10-09 coordinator screen showed Claude's input box as `❯�` under "Press Ctrl-C again to exit": the box was empty to Claude but not to the reader, so the clear's Ctrl+C had armed the exit and the send's own recovery (session_chat_queue_runtime/send_heal.rs) would have typed the second one. While the hint is up the clear sends no Ctrl+C and waits for it to go away.
+fn exit_is_armed(screen: &str) -> bool {
+    screen
+        .lines()
+        .rev()
+        .filter(|line| !line.trim().is_empty())
+        .take(4)
+        .any(|line| {
+            let line = line.to_ascii_lowercase();
+            ["ctrl-c again", "ctrl+c again", "ctrl + c again"]
+                .iter()
+                .any(|hint| line.contains(hint))
+                && (line.contains("exit") || line.contains("quit"))
+        })
+}
+
 fn kill_lines_backward(rows: usize) -> String {
     AGENT_TUI_CLEAR_INPUT_LINE
         .repeat((rows + AGENT_TUI_CLEAR_LINE_SLACK).min(AGENT_TUI_CLEAR_MAX_LINES))
@@ -121,7 +138,9 @@ pub async fn clear_session_chat_composer(
                         }
                     } else {
                         match method {
-                            Some(ComposerClearMethod::InterruptOnce) if !interrupt_sent => {
+                            Some(ComposerClearMethod::InterruptOnce)
+                                if !interrupt_sent && !exit_is_armed(&screen) =>
+                            {
                                 interrupt_sent = true;
                                 Some("\u{3}".to_string())
                             }

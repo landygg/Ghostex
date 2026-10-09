@@ -383,6 +383,16 @@ impl SessionChatQueueRuntime {
                     self.reset_gate(&key);
                     continue;
                 }
+                // CDXC:SessionChat 2026-10-09 WHY: an exited agent is restarted by the send itself and the row waits for it (the 2026-10-09 DECISION in send_heal.rs), so the row is delivered instead of failed with "no longer running".
+                if notice.kind == crate::session_chat_notice::SESSION_CHAT_NOTICE_AGENT_EXITED {
+                    ready.push(ReadyDelivery {
+                        project_id,
+                        session_id,
+                        prompt_id: head.id.clone(),
+                        model_selection: None,
+                    });
+                    continue;
+                }
                 if notice.blocks_queued_delivery()
                     && !escape_closes_claude_panel(&composer, &notice)
                 {

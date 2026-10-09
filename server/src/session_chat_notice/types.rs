@@ -36,6 +36,8 @@ clients already render it. Splitting the affirmative case into a second kind
 would silently opt it out of all three.
 */
 pub const SESSION_CHAT_NOTICE_DELIVERY_FAILED: &str = "deliveryFailed";
+/// The id of the Fix it action on a delivery card the send recovery gave up on.
+pub const SESSION_CHAT_NOTICE_ACTION_FIX_SEND: &str = "fixSend";
 /*
 CDXC:AgentScreenDetection 2026-08-28:
 The agent's API refused to answer the last message (Claude Code's safeguards
@@ -173,6 +175,17 @@ impl SessionChatTerminalNoticeAction {
             label: label.to_string(),
             kind: SessionChatTerminalNoticeActionKind::SendKeys,
             send: Some(send.to_string()),
+        }
+    }
+
+    /// Fix it: the send recovery gxserver already tried on its own (session_chat_queue_runtime/send_heal.rs),
+    /// run again because the user asked. It rides the `restartAgent` answer every client already sends.
+    pub fn fix_send() -> Self {
+        Self {
+            id: SESSION_CHAT_NOTICE_ACTION_FIX_SEND.to_string(),
+            label: "Fix it".to_string(),
+            kind: SessionChatTerminalNoticeActionKind::RestartAgent,
+            send: None,
         }
     }
 
