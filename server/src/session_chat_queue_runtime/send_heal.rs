@@ -38,6 +38,7 @@ pub(super) async fn heal_refused_send(
     text: &str,
     retry_steps: Vec<crate::session_chat_send::SessionChatSendStep>,
     send_started_ms: i64,
+    kept_in_box: bool,
 ) -> SendHeal {
     if paste_already_recorded(&target.session, text, send_started_ms).await {
         record(
@@ -101,6 +102,17 @@ pub(super) async fn heal_refused_send(
         if paste_already_recorded(&target.session, text, send_started_ms).await {
             return SendHeal::Delivered;
         }
+    }
+    // The message reached the input box, so the terminal and the agent are taking input; a
+    // restart would cost the agent its background work without answering why Enter was kept.
+    if running && kept_in_box {
+        record(
+            state,
+            target,
+            "sessionChatSendHealGaveUp",
+            "The agent took the message into its input box but kept it there; it was not restarted.",
+        );
+        return SendHeal::GaveUp;
     }
     match restart_agent_for_send(state, target, running).await {
         Ok(()) => SendHeal::Restarting,
@@ -218,6 +230,11 @@ pub(crate) async fn restart_agent_for_send(
     if agent_running && agent_is_busy(&session).await {
         return Err("the agent is in the middle of a turn");
     }
+    if agent_running {
+        if let Some(reason) = work_a_restart_would_end(state, target).await {
+            return Err(reason);
+        }
+    }
     let key = format!("{}:{}", target.project_id, target.session_id);
     {
         let restarts = SEND_HEAL_RESTARTS.get_or_init(|| Mutex::new(HashMap::new()));
@@ -306,6 +323,43 @@ async fn has_conversation_to_resume(session: &Value) -> bool {
     })
     .await
     .unwrap_or(false)
+}
+
+/// CDXC:SessionChat 2026-10-10 WHY:
+/// On 2026-10-09 a send refused by a mastro_ed orchestrator restarted it on its conversation, which ended its 7 background tasks and monitors while 11 of its threads were still open; an idle turn says nothing about work that runs between turns. A live agent that coordinates threads, or whose Claude footer counts background tasks (`⧉ N`), is never restarted automatically; the send gets its card instead.
+async fn work_a_restart_would_end(
+    state: &AppState,
+    target: &crate::session_chat_send::SessionChatSendTarget,
+) -> Option<&'static str> {
+    let coordinating = open_gxserver_database(&state.paths).ok().is_some_and(|db| {
+        crate::coordinators::read_coordinator(&db, &target.project_id, &target.session_id)
+            .ok()
+            .flatten()
+            .is_some()
+            || crate::coordinators::list_threads_for(&db, &target.project_id, &target.session_id)
+                .is_ok_and(|threads| threads.iter().any(|thread| !thread.is_resolved()))
+    });
+    if coordinating {
+        return Some("the agent coordinates threads, and a restart would end its background work");
+    }
+    let screen = crate::session_chat_send::capture_session_terminal_text(&target.zmx_name).await;
+    if screen.as_deref().is_some_and(shows_claude_background_tasks) {
+        return Some("the agent has background tasks a restart would end");
+    }
+    None
+}
+
+/// Claude's footer counts the session's running background tasks as `⧉ N`
+/// (`⏵⏵ bypass permissions on (shift+tab to cycle) · ⧉ 7 · ← for agents`).
+fn shows_claude_background_tasks(screen: &str) -> bool {
+    screen.lines().rev().take(8).any(|line| {
+        line.split('·').any(|part| {
+            part.trim()
+                .strip_prefix('⧉')
+                .and_then(|count| count.trim().parse::<u32>().ok())
+                .is_some_and(|count| count > 0)
+        })
+    })
 }
 
 /// Whether a live agent is doing anything a restart would cut short.
