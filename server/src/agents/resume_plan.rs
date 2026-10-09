@@ -533,6 +533,18 @@ pub(crate) fn build_agent_resume_command(
             }
         }
         "claude" => {
+            // CDXC:SessionChat 2026-10-09 WHY:
+            // A session whose Claude has no conversation yet has nothing to lose, so a wake starts it fresh under the same session id instead of resuming. A wake used to resume whatever id the session held, and a Claude that quit before its first message printed "No conversation found with session ID" and fell back to the shell, so the automatic send recovery and Fix it (session_chat_queue_runtime/send_heal.rs) both failed on it. Every wake now follows the account switch's rule (CDXC:AgentProviders 2026-10-04 above).
+            if let Some(id) = claude_exact_reference
+                .as_deref()
+                .and_then(|exact| get_claude_session_id(Some(exact)))
+                .filter(|id| !claude_transcript_written(input, id))
+            {
+                return Some(build_claude_fresh_invocation(
+                    agent_command,
+                    &quote_shell_double_arg(&id),
+                ));
+            }
             if let Some(exact) = claude_exact_reference {
                 let resume_invocation =
                     build_claude_resume_invocation(agent_command, &quote_shell_double_arg(&exact));

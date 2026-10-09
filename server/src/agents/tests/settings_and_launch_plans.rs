@@ -460,12 +460,23 @@ fn resume_plan_extracts_provider_exact_identity_hints() {
         settings.insert("agentAcceptAllEnabled".to_string(), Value::Bool(false));
         settings
     };
+    // A written transcript: a Claude conversation that was never written starts fresh instead.
+    let transcripts = tempfile::tempdir().expect("tempdir");
+    let transcript = transcripts
+        .path()
+        .join("9970b270-b39f-4d63-a764-fa8d88083995.jsonl");
+    std::fs::write(
+        &transcript,
+        "{}
+",
+    )
+    .expect("transcript");
     let claude = json!({
         "agentId": "claude",
         "launchSettings": {},
         "runtimeSettings": {
             "agentCommand": "claude",
-            "agentSessionPath": "/Users/example/.claude/projects/-repo-ghostex/9970b270-b39f-4d63-a764-fa8d88083995.jsonl",
+            "agentSessionPath": transcript.to_string_lossy(),
             "titleSource": "user"
         },
         "title": "Readable Claude title",

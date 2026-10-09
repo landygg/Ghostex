@@ -212,7 +212,7 @@ pub(crate) async fn restart_agent_for_send(
     let session = resolve_session_chat_send_target(state, &params, "sendHeal")
         .map(|current| current.session)
         .map_err(|_| "the session could not be read")?;
-    if read_runtime_text(&session, "agentSessionId").is_none() {
+    if !has_conversation_to_resume(&session).await {
         return Err("the agent has no conversation to resume");
     }
     if agent_running && agent_is_busy(&session).await {
@@ -273,6 +273,39 @@ pub(crate) async fn cycle_session(
         }
     }
     Ok(())
+}
+
+/// Whether a wake brings the agent back on this session's conversation. Claude and Pi need only
+/// the session id: a wake resumes a conversation that was written and starts a fresh one under
+/// the same id otherwise (agents/resume_plan.rs), since a session with no conversation yet has
+/// nothing to lose. Any other agent resumes by id alone, so its transcript must exist; on
+/// 2026-10-09 a wake that resumed an unwritten Claude conversation printed "No conversation found"
+/// and went back to the shell.
+async fn has_conversation_to_resume(session: &Value) -> bool {
+    let Some(agent_session_id) = read_runtime_text(session, "agentSessionId") else {
+        return false;
+    };
+    let agent = session_chat_agent_for_session(session);
+    if matches!(
+        crate::agents::identity::normalize_agent_id(agent.as_deref()).as_deref(),
+        Some("claude" | "pi")
+    ) {
+        return true;
+    }
+    let Some(transcript_agent) = resolve_session_chat_transcript_agent(agent.as_deref()) else {
+        return true;
+    };
+    let agent_session_path = read_runtime_text(session, "agentSessionPath");
+    tokio::task::spawn_blocking(move || {
+        resolve_session_chat_transcript_path(
+            transcript_agent,
+            Some(&agent_session_id),
+            agent_session_path.as_deref(),
+        )
+        .is_some_and(|path| path.is_file())
+    })
+    .await
+    .unwrap_or(false)
 }
 
 /// Whether a live agent is doing anything a restart would cut short.
