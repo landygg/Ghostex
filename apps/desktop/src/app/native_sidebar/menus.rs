@@ -666,14 +666,26 @@ impl GhostexGpuiApp {
                             )
                         })
                         .when_some(item.get("secondary"), |row, secondary| {
+                            let label = secondary["label"].as_str().unwrap_or_default().to_owned();
+                            let icon_only = label.is_empty();
                             row.child(
                                 h_flex()
                                     .id(format!("native-menu-secondary-{panel_index}-{item_index}"))
                                     .h(px(28.0 * scale))
-                                    .px(px(5.0 * scale))
-                                    .gap(px(3.0 * scale))
                                     .rounded(px(4.0 * scale))
                                     .hover(|button| button.bg(hover))
+                                    // An icon-only button (the workspace menu's new-window button)
+                                    // is a square whose icon centre lines up with the checkmark
+                                    // other rows show at the same right edge (14px wide, flush).
+                                    .when(icon_only, |button| {
+                                        button
+                                            .w(px(22.0 * scale))
+                                            .justify_center()
+                                            .mr(px(-4.0 * scale))
+                                    })
+                                    .when(!icon_only, |button| {
+                                        button.px(px(5.0 * scale)).gap(px(3.0 * scale))
+                                    })
                                     .child(
                                         gpui::svg()
                                             .path(gpui_sidebar_command_icon_asset_path(
@@ -682,9 +694,7 @@ impl GhostexGpuiApp {
                                             .size(px(14.0 * scale))
                                             .text_color(foreground),
                                     )
-                                    .child(
-                                        secondary["label"].as_str().unwrap_or_default().to_owned(),
-                                    )
+                                    .when(!icon_only, |button| button.child(label))
                                     .on_click(cx.listener(move |app, _, _, cx| {
                                         cx.stop_propagation();
                                         app.activate_native_sidebar_menu_secondary(
