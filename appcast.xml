@@ -8,6 +8,49 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
         <link>https://github.com/maddada/Ghostex/releases</link>
         <description>Sparkle appcast for Ghostex macOS releases.</description>
         <item>
+            <title>10.18.0</title>
+            <pubDate>Fri, 09 Oct 2026 23:04:43 +0000</pubDate>
+            <sparkle:fullReleaseNotesLink>https://github.com/maddada/Ghostex/releases/tag/v10.18.0</sparkle:fullReleaseNotesLink>
+            <sparkle:version>101800</sparkle:version>
+            <sparkle:shortVersionString>10.18.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <description sparkle:format="markdown"><![CDATA[# Ghostex 10.18.0
+
+## 10.18.0 - 2026-10-10
+
+**Ghostex 10.18.0 is out.** Coordinators are now called Orchestrators, failed sends fix themselves, the phone app stops crashing and reaches your Windows computer again, and Windows hooks, cloning and helper windows behave.
+
+### 🧭 Orchestrators
+- **Coordinators are now called Orchestrators** across the app, the phone, Help and the CLI; `ghostex orchestrator` is the new command and `ghostex coordinator` still works.
+
+### 💬 Chat
+- **Failed sends fix themselves:** Ghostex redraws a stuck screen, retypes once, or restarts the agent on its own conversation and delivers your message, and shows a card with one Fix it button only when that fails. It never restarts an orchestrator or a session with background work.
+- **A Claude session that quit before its first message starts fresh** instead of failing to resume.
+- **Messages from other agents show their real text,** and Not sent appears only when a send really failed.
+- **Claude Code's internal suggestion queries no longer show up as questions in the chat,** and its faint guess at your next message is no longer mistaken for typed text.
+- **Sliding a panel no longer re-wraps or rebuilds the chat every frame,** and the question card's buttons have an outline.
+
+### 🪟 Windows
+- **Agent hooks no longer time out on Windows** for Claude, Codex, Grok, OpenClaude and OpenCode, thanks to @gvastethecreator.
+- **No more console windows flashing** from anything Ghostex starts in the background.
+- **Window glass uses Windows 11's own blur,** so sidebar and panel slides run about three times faster, menus share the panels' bluish fill, and toasts no longer show a square blur; new installs on Windows still start with glass off.
+
+### 📂 Projects and Files
+- **Add Project's clone shows git's progress,** can be cancelled, never hangs on a password prompt, and starts at your drives on Windows.
+- **Project websites like GitHub, Linear and Jira open straight to the page** instead of a command screen.
+- **Confirm delete in the files list is bold red,** and text buttons in Settings and the Agents Hub have an outline.
+- **The hooks card shows Install all only when needed,** with Uninstall all (now confirmed first) in a ⋯ menu and Refresh as an icon, and long extension descriptions show in full on hover.
+
+### 📱 Phone
+- **The Android app no longer crashes** and can send to a Windows computer again; Ghostex on the computer also listens where older phone apps look.
+
+### 🧩 Workspaces and Work Mode
+- **Work Mode adds team Linear keys and GitHub as a workspace's tracker,** with work cards on the phone (Settings > Extensions > Workspaces and Work Mode).
+]]></description>
+            <enclosure url="https://github.com/maddada/Ghostex/releases/download/v10.18.0/ghostex-10.18.0-arm64.dmg" length="120128470" type="application/octet-stream" sparkle:edSignature="PhwpIo7++SZ1mqq9EkdkgzYkHydnimuChwr8RjX5T8kWNDh0/yZM9GuDfEvloOb+hfxS8ais4wxCFs0ke5zaBA=="/>
+        </item>
+        <item>
             <title>10.17.0</title>
             <pubDate>Fri, 09 Oct 2026 13:44:47 +0000</pubDate>
             <sparkle:fullReleaseNotesLink>https://github.com/maddada/Ghostex/releases/tag/v10.17.0</sparkle:fullReleaseNotesLink>
@@ -245,64 +288,6 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
             <enclosure url="https://github.com/maddada/Ghostex/releases/download/v10.14.0/ghostex-10.14.0-arm64.dmg" length="115191408" type="application/octet-stream" sparkle:edSignature="vLlCw4fxdH1RS6G8+jMGxGniAzHKiJ3D8SJma7hB0ym0LNsMZZ+yuNfZMX/HSfV4M11YBaoUV2rM+JYv1SO0Bg=="/>
         </item>
         <item>
-            <title>10.13.0</title>
-            <pubDate>Tue, 06 Oct 2026 00:13:40 +0000</pubDate>
-            <sparkle:fullReleaseNotesLink>https://github.com/maddada/Ghostex/releases/tag/v10.13.0</sparkle:fullReleaseNotesLink>
-            <sparkle:version>101300</sparkle:version>
-            <sparkle:shortVersionString>10.13.0</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
-            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <description sparkle:format="markdown"><![CDATA[# Ghostex 10.13.0
-
-## 10.13.0 - 2026-10-06
-
-**Ghostex 10.13.0 is out.** Ghostex can spend a banked Claude or Codex reset before it expires, Windows gets real system notifications, working sessions can fold into a Working section, the built-in browser can open, save and copy links and images, and Pi works much better.
-
-### 👥 Accounts
-- **Ghostex can spend a banked Claude or Codex reset for you before it expires.** It only uses a reset that would otherwise be lost. Turn it on per provider in Settings > Accounts > Auto-redeem expiring resets (off by default).
-- **The bell warns in red when a banked reset expires within 3 days and again within 24 hours,** with an optional system notification (Settings > General > Notifications > Reset Expiry Notifications).
-
-### 🔔 Notifications
-- **Windows: attention alerts and reset warnings show as real Windows notifications,** and clicking one brings Ghostex forward on that session. Linux shows them through the desktop's notifications.
-
-### 🗂️ Sidebar
-- **Group working sessions moves sessions into a collapsed Working section under their project while their agent works.** The session you have open and sessions with an unanswered question stay in Sessions, and a session goes back on its own when its agent stops. Turn it on in Settings > Sidebar or the sidebar's More > Sort & Filter (off by default).
-- **Drag sideways with the mouse on an empty part of the sidebar list to switch Spaces,** like a sideways trackpad swipe; one switch per drag, with a grabbing hand cursor.
-- **Sidebar setting changes show right away** instead of after a delay.
-
-### 🧭 Coordinators
-- **The Threads panel lists the 3 most recently finished threads,** with older ones folded into "N more done", on the computer and the phone.
-- **Threads keep the title their coordinator gives them.**
-- **A message to an agent is typed at most once,** even when the send is retried after a timeout or a restart.
-
-### 🤖 Pi
-- **Pi works on native Windows and reports its state accurately:** a finished turn only when nothing more is coming, Esc as an interrupt, and its dialogs as needing you.
-- **The chat shows Pi's thinking, links each tool call to its result, and shows provider errors and Pi's edit diffs.**
-
-### 🌐 Browser
-- **Right-click a link or an image in the built-in browser** to open it in a new tab, save it, or copy it or its address. Downloads a page starts ask where to save instead of being dropped.
-
-### 🧩 Integrations
-- **Desktop control is now called Fast Computer & Browser Use,** links to the trycua/cua project, and installs the driver's own Cua Driver skill, which the Agent skills list can also install or remove.
-
-### 🪟 Windows
-- **The Dev servers panel lists this computer's servers in PowerShell mode** instead of saying it could not inspect WSL ports.
-- **`ghostex ports` works on native Windows,** so the phone's Web preview lists this computer's servers with their page titles.
-- **Clicking the title bar no longer leaves the chat selecting text as the mouse moves.**
-- **The "Paste potentially unsafe text?" confirmation opens above browser tabs and the Files view** instead of being hidden behind them.
-
-### 📱 On the phone
-- **Android: the status bar shows the Ghostex flower** instead of a terminal icon.
-
-### 🩹 Fixes and polish
-- **macOS: arrow keys move the cursor in the VS Code view** instead of typing red FS/GS/RS/US characters.
-- **Every tooltip has rounded corners.**
-- **Opening a General setting by name lands on General with the setting found,** instead of an empty search on the last page you used.
-- **A `ghostex` command that times out says so** instead of telling you to start Ghostex.
-]]></description>
-            <enclosure url="https://github.com/maddada/Ghostex/releases/download/v10.13.0/ghostex-10.13.0-arm64.dmg" length="112092928" type="application/octet-stream" sparkle:edSignature="vMcNA8FwXuHUnDoPAA90IGF884BNH9DiDKKzsoC2r7r3Ml1TGqM9lDYFrX06cZR3h8Y6zhzil1uwyPEIjIlMCw=="/>
-        </item>
-        <item>
             <title>3.26.1</title>
             <pubDate>Mon, 01 Jun 2026 18:43:20 +0400</pubDate>
             <sparkle:fullReleaseNotesLink>https://github.com/maddada/Ghostex/releases/tag/v3.26.1</sparkle:fullReleaseNotesLink>
@@ -314,6 +299,6 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
     </channel>
 </rss>
 <!-- sparkle-signatures:
-edSignature: 9BpxPu2DgR85EmQbkGcXzVlYhsDlLH3s7brIDOmVi6iBt2cn4n4XqNVlhvDncaj0gF04zKYyQJHWqK0cLPi5BQ==
-length: 24732
+edSignature: J6JC1IcYwORPsF0ZDg3VgeA7obZ8mCaZMUYWOA06b2NXUuTWlSPHrE50RZ9YllRRUOmPyqdS2LVY2ae/P2GGDA==
+length: 23724
 -->
