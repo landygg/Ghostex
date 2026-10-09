@@ -983,6 +983,7 @@ pub fn dispatch_zmx_session_interaction_endpoint(
     let diagnostic_source = read_diagnostic_input_source(params);
     match endpoint_path {
         "/api/readSessionText" => {
+            let agent = crate::session_chat_composer::session_chat_composer_agent_id(&session);
             let result = run_zmx_interaction_command(
                 build_zmx_history_command(&zmx_name, &zmx.executable_path),
                 ZmxCommandOptions {
@@ -1000,7 +1001,15 @@ pub fn dispatch_zmx_session_interaction_endpoint(
             output.insert("provider".to_string(), json!("zmx"));
             output.insert("session".to_string(), session);
             output.insert("source".to_string(), json!("history"));
-            output.insert("text".to_string(), Value::String(result.stdout));
+            let (text, suggestion) = super::read_text_suggestion::mark_claude_input_suggestion(
+                agent.as_deref(),
+                &zmx_name,
+                result.stdout,
+            );
+            if let Some(suggestion) = suggestion {
+                output.insert("inputSuggestion".to_string(), Value::String(suggestion));
+            }
+            output.insert("text".to_string(), Value::String(text));
             output.insert(
                 "truncated".to_string(),
                 Value::Bool(result.stdout_truncated),

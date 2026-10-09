@@ -371,6 +371,7 @@ fn send_gxserver_rename_command(payload: &Value, flags: &Flags) -> CliResult<Val
 
 pub(super) fn terminal_text_for_cli_key(key: &str) -> Option<&'static str> {
     match key {
+        "enter" | "Enter" => Some("\r"),
         "ctrl-c" | "Control+C" => Some("\u{0003}"),
         "escape" | "Escape" => Some("\u{001b}"),
         "tab" | "Tab" => Some("\t"),

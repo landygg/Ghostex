@@ -378,7 +378,7 @@ pub fn usage() -> String {
     let input_commands = [
         format_help_command("send-text <selector> <text>", "Type text into a session by id or quoted title"),
         format_help_command("send-enter <selector>", "Send Enter to a session by id or quoted title"),
-        format_help_command("send-key <selector> <key>", "Send ctrl-c, escape, tab, or arrow keys"),
+        format_help_command("send-key <selector> <key>", "Send enter, ctrl-c, escape, tab, or arrow keys"),
         format_help_command("send-message <selector> <text>", "Type text and Enter into an existing session"),
         format_help_command("read-text <selector> [--lines n] [--visible] [--json]", "Read terminal text by id or quoted title"),
         format_help_command("search-agent-prompts [--query text] [--agents a,b] [--project path] [--group-by-day] [--limit n] [--offset n] --json", "Search every prompt this machine has sent to an agent (the GUI behind gx f)"),
