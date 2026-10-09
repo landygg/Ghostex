@@ -6,9 +6,9 @@
 //! User: "let's make this not appear on windows because it's not changeable it looks like", then chose to hide the Blur slider on Windows only while "What shows behind the glass" is Desktop and windows (the system draws that blur and has no radius to set), and to hide the macOS-only Menu blur slider on Windows and Linux everywhere it is listed. Blur stays on Windows for Wallpaper only, Custom image and Live, where it blurs the picture.
 //! SEE-ALSO: apps/desktop/src/app/window/settings_modal/store.rs, apps/desktop/src/app/window/settings_modal/tabs/theme/transparency.rs, server/src/ghostex_cli/settings.rs.
 //!
-//! CDXC:Theming 2026-10-04 DECISION:
-//! User: "please disable transparency by default on windows to make the app faster by default for users". Enable transparency (`windowGlass`) defaults to Never (`opaque`) on Windows; macOS and Linux keep Dark only. A saved choice always wins.
-//! SEE-ALSO: apps/desktop/src/app/helpers/window_glass.rs (`refresh_window_glass`).
+//! CDXC:Theming 2026-10-10 DECISION:
+//! User: "please disable transparency by default on windows to make the app faster by default for users" (2026-10-04), then "turn blur off by default for windows in the setup" (2026-10-10). Enable transparency (`windowGlass`) defaults to Never (`opaque`) on Windows, in Settings and in the first-run setup's transparency switch, which starts off; macOS and Linux keep Dark only. A saved choice always wins.
+//! SEE-ALSO: apps/desktop/src/app/helpers/window_glass.rs (`refresh_window_glass`), apps/desktop/src/app/window/onboarding/model.rs (the setup's starting value).
 
 use crate::json::J;
 use crate::Platform;
