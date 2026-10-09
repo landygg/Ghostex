@@ -181,7 +181,7 @@ impl GpuiAppModalKind {
             Self::SidebarSpaceEditor => "Ghostex Space",
             Self::GitCommit => "Ghostex Commit Changes",
             Self::GitFileDiff => "Ghostex File Diff",
-            Self::MermaidDiagram | Self::MarkdownTable | Self::VisualPage => "",
+            Self::MermaidDiagram | Self::MarkdownTable => "",
             Self::PortlessSetup => "Ghostex Portless Setup",
             Self::Extension(_) => "Ghostex Extension",
             Self::UpdateAvailable => "Ghostex Update",
