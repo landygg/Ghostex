@@ -563,7 +563,11 @@ impl GhostexGpuiApp {
             self.scroll_focused_browser_pane_active_tab();
             return;
         }
-        let created_tab_id = self.browser_tabs.add_loaded_popup_tab(
+        /*
+        CDXC:Browser 2026-10-10 DECISION:
+        User: "when i click on this button to open in a new github tab or on the linear button to open on linear tab in the embedded browser we're opening a useless empty new browser tab pls fix", then "pls fix this for all similar cases in the app". Every project's Browser carries an empty "New Tab" placeholder even if it never opened the Browser, and appending here left it beside the page once the Browser came on screen. Every open through this door therefore loads the link into that sole placeholder, as page popups already do (`open_loaded_popup_tab`).
+        */
+        let created_tab_id = self.browser_tabs.open_loaded_popup_tab(
             url,
             self.browser_profiles.active_profile_id(),
             cef::BrowserPopupPlacement::Selected,

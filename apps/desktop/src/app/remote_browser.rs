@@ -379,7 +379,7 @@ impl GhostexGpuiApp {
             return;
         }
         let profile = self.browser_profiles.active_profile_id();
-        if let Some(tab_id) = self.browser_tabs.add_loaded_popup_tab(
+        if let Some(tab_id) = self.browser_tabs.open_loaded_popup_tab(
             site.url.clone(),
             profile,
             cef::BrowserPopupPlacement::Selected,
@@ -425,7 +425,7 @@ impl GhostexGpuiApp {
             return;
         }
         let profile = self.browser_profiles.active_profile_id();
-        if let Some(tab_id) = self.browser_tabs.add_loaded_popup_tab(
+        if let Some(tab_id) = self.browser_tabs.open_loaded_popup_tab(
             site.url.clone(),
             profile,
             cef::BrowserPopupPlacement::Selected,
