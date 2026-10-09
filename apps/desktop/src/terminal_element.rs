@@ -5101,6 +5101,8 @@ pub fn set_grid_resize_held(held: bool) {
     GRID_RESIZE_HELD.store(held, std::sync::atomic::Ordering::Relaxed);
 }
 
-fn grid_resize_held() -> bool {
+/// Whether the window's panels are sliding (`panel_motion.rs`), so a size seen this frame is not
+/// the one the layout will settle at.
+pub(crate) fn grid_resize_held() -> bool {
     GRID_RESIZE_HELD.load(std::sync::atomic::Ordering::Relaxed)
 }

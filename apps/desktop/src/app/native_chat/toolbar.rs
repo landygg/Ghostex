@@ -153,18 +153,26 @@ impl NativeChatView {
                         if chat.composer_measurements.as_ref() == Some(&measurements) {
                             return;
                         }
-                        chat.composer_measurements = Some(measurements.clone());
+                        // CDXC:SessionChat 2026-10-10 WHY: while a panel slides the composer's width changes every frame, and each measurement the core hears makes it rebuild the whole thread's document, which in a very long thread made the slide stutter. The fit below is applied every frame; the core hears the width the slide settles at (the settling frame refreshes every view).
+                        let sliding = crate::terminal_element::grid_resize_held();
+                        if !sliding {
+                            chat.composer_measurements = Some(measurements.clone());
+                        }
                         // Geometry is available before the session is. Apply the fit rules
                         // immediately, including while the controller is still booting.
                         if let Ok(measured) = serde_json::from_value(measurements.clone()) {
-                            let fit = ghostex_gx_chat_core::composer::layout::fit_composer_controls(
-                                &measured,
+                            let fit = json!(
+                                ghostex_gx_chat_core::composer::layout::fit_composer_controls(
+                                    &measured,
+                                )
                             );
-                            std::sync::Arc::make_mut(&mut chat.snapshot)["composerOverflow"] =
-                                json!(fit);
-                            cx.notify();
+                            if chat.snapshot["composerOverflow"] != fit {
+                                std::sync::Arc::make_mut(&mut chat.snapshot)["composerOverflow"] =
+                                    fit;
+                                cx.notify();
+                            }
                         }
-                        if chat.composer_ready {
+                        if chat.composer_ready && !sliding {
                             chat.invoke(
                                 json!({"type":"measureComposer","measurements":measurements}),
                                 cx,

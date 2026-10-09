@@ -413,7 +413,8 @@ impl NativeChatView {
                 let chat=chat.clone();
                 window.defer(cx,move |_,cx| {
                     let _=chat.update(cx,|chat,cx| {
-                        if chat.context_status_measurements.as_ref()==Some(&measurement) {return;}
+                        // A sliding panel's width is not the settled one; the core hears that one (see `composer_measurement`).
+                        if chat.context_status_measurements.as_ref()==Some(&measurement) || crate::terminal_element::grid_resize_held() {return;}
                         chat.context_status_measurements=Some(measurement.clone());
                         let mut command=measurement;
                         command["type"]="measureContextStatus".into();

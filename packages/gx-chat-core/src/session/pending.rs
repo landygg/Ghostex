@@ -299,6 +299,10 @@ fn filter_pending_sends(
     messages: &[ChatMessage],
     mode: Mode,
 ) -> Vec<PendingSend> {
+    // CDXC:SessionChat 2026-10-10 WHY: matching an echo normalizes the text of every user message in the transcript, and this runs on every event the core handles (a live update, the composer's width while a panel slides). With nothing pending the answer is always nothing, so a very long thread no longer pays for its whole history on each event.
+    if pending.is_empty() {
+        return Vec::new();
+    }
     let counts = |rows: &[&ChatMessage]| match mode {
         Mode::Advanced => advanced_user_content_counts(rows),
         Mode::Matching => matching_user_content_counts(rows),
@@ -334,6 +338,10 @@ fn filter_pending_sends(
         .filter(|(_, keep)| **keep)
         .map(|(entry, _)| entry)
         .collect();
+    // Every echo matched its row exactly: nothing below can keep one.
+    if still_open.is_empty() {
+        return Vec::new();
+    }
     let all_rows: Vec<&ChatMessage> = messages.iter().collect();
     let glued = select_pending_indices_represented(&still_open, &texts(&all_rows));
 
