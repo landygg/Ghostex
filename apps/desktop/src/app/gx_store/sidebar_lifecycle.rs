@@ -541,6 +541,14 @@ impl GhostexGpuiApp {
     /// The option is the caller's, not the row's: Full Reload's second leg asks for the remount
     /// that tears down the terminal its own sleep killed. It is carried as data from gx-core rather
     /// than decided here, so the gate can compare which leg asked for what.
+    ///
+    /// CDXC:FocusRouting 2026-10-10 WHY:
+    /// The store's selection moves first, as a row click's does (the old runtime's
+    /// `focusLocalWorkspaceSession` set its focus copy before posting). Without it the neighbour a
+    /// close or sleep hands the focus to kept the closed session as the store's selection, so a
+    /// neighbour that needed an attach (a Chat View session has no terminal viewer) was dropped by
+    /// the attach completion's "the store names this session" check: nothing was shown or focused,
+    /// and keys and hotkeys went nowhere until the user clicked the window.
     pub(super) fn gx_store_select_local_workspace_session(
         &mut self,
         session: &SessionKey,
@@ -548,6 +556,13 @@ impl GhostexGpuiApp {
         options: FocusOptions,
         cx: &mut gpui::Context<Self>,
     ) {
+        let key = GpuiLocalWorkspaceSessionKey {
+            project_id: session.project_id.clone(),
+            session_id: session.session_id.clone(),
+        };
+        if !self.gx_store_selection_names_local_session(&key) {
+            self.gx_store_select_local_session(&key, false, false, cx);
+        }
         self.focus_local_workspace_terminal_from_message(
             &GpuiSidebarWorkspaceTerminalFocusMessage {
                 force_remount: options.force_remount,

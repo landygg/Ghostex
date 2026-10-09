@@ -453,10 +453,13 @@ impl GhostexGpuiApp {
                     }
                 }
             }
-            ShellKeyboardOwner::TerminalMounting => {}
+            ShellKeyboardOwner::TerminalMounting => {
+                self.hold_unfocused_keyboard_on_root(window, cx);
+            }
             ShellKeyboardOwner::ChatComposer(session_id) => {
                 if !self.native_chat_views.contains_key(&session_id) {
                     // Native input can take focus before its background runtime restores the draft.
+                    self.hold_unfocused_keyboard_on_root(window, cx);
                     return;
                 }
                 self.pending_keyboard_handoff = None;
@@ -501,7 +504,20 @@ impl GhostexGpuiApp {
             }
             ShellKeyboardOwner::Nothing => {
                 self.pending_keyboard_handoff = None;
+                self.hold_unfocused_keyboard_on_root(window, cx);
             }
+        }
+    }
+
+    /// CDXC:FocusRouting 2026-10-10 WHY:
+    /// GPUI sends keys along the focused element's path, and with no live focus (the focused terminal's tab was closed, or a hidden one was released) only the window's outermost element sees them, above the root that holds every app hotkey and the wake-on-type and terminal forwarding listeners. A handoff with nothing to focus yet (a sleeping or empty pane, a terminal still mounting, a chat still loading) therefore parks the keyboard on that root's own handle, so hotkeys keep working until the surface arrives and the pending handoff moves it there. A focus that is still live (a sidebar rename, a search field) is left alone.
+    pub(crate) fn hold_unfocused_keyboard_on_root(
+        &self,
+        window: &mut Window,
+        cx: &mut gpui::Context<Self>,
+    ) {
+        if window.focused(cx).is_none() {
+            window.focus(&self.root_action_focus_handle, cx);
         }
     }
 
@@ -621,10 +637,12 @@ impl GhostexGpuiApp {
         );
         #[cfg(not(target_os = "macos"))]
         let _ = root;
+        // Onto the root's handle rather than nowhere (`hold_unfocused_keyboard_on_root`): a blur
+        // left only the window's outermost element on the key path, so hotkeys stopped working.
         if let Some(view) = self.gpui_engine_terminal_view_for_target(target)
             && view.read(cx).focus_handle(cx).is_focused(window)
         {
-            window.blur(cx);
+            window.focus(&self.root_action_focus_handle, cx);
         }
         support_logs::append(
             support_logs::GpuiSupportLog::TerminalFocus,

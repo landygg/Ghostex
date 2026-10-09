@@ -72,6 +72,15 @@ impl GhostexGpuiApp {
     ) {
     }
 
+    /// The desktop selects a new terminal's tab before its attach returns; the page's open already shows the session.
+    pub(crate) fn show_created_terminal_tab_while_attaching(
+        &mut self,
+        _project_id: &str,
+        _session_id: &str,
+        _cx: &mut Context<Self>,
+    ) {
+    }
+
     /// The desktop's pane tab switches to Chat through a launch intent; the page opens the session on the surface the focus prefers.
     pub(crate) fn arm_created_session_chat_launch_intent(
         &mut self,

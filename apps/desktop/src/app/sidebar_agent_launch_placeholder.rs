@@ -245,4 +245,87 @@ impl GhostexGpuiApp {
         self.persist_shell_layout_state();
         cx.notify();
     }
+
+    /// A new plain terminal's tab is selected in the focused pane as soon as the create returns,
+    /// showing the terminal skeleton, and its attach fills that same tab in place.
+    ///
+    /// CDXC:FocusRouting 2026-10-10 WHY:
+    /// The tab used to be selected only when the attach plan came back, and on Windows that plan
+    /// starts the shell and its wmx daemon (about 0.8s measured, longer on a busy machine), so the
+    /// new row was in the sidebar while the work area stayed on the previous session. A tab with
+    /// nothing attached yet is Mounting and never a startup candidate, so it cannot launch a shell
+    /// of its own; the attach completion reuses the mapped tab (`insert_gpui_local_workspace_attach_terminal`).
+    pub(crate) fn show_created_terminal_tab_while_attaching(
+        &mut self,
+        project_id: &str,
+        session_id: &str,
+        cx: &mut gpui::Context<Self>,
+    ) {
+        let key = GpuiLocalWorkspaceSessionKey {
+            project_id: project_id.trim().to_string(),
+            session_id: session_id.trim().to_string(),
+        };
+        // Only while this create's attach is still in flight and nothing newer took the focus.
+        if self.agents_workspace_project_id.as_deref() != Some(key.project_id.as_str())
+            || self.local_workspace_latest_focus_key.as_ref() != Some(&key)
+            || !self.local_workspace_attach_pending.contains(&key)
+        {
+            return;
+        }
+        let mapped = self
+            .local_workspace_session_mappings
+            .get(&key)
+            .copied()
+            .filter(|shell_session_id| {
+                self.agents_workspace
+                    .pane_id_for_session(*shell_session_id)
+                    .is_some()
+            });
+        let shell_session_id = match mapped {
+            Some(shell_session_id) => shell_session_id,
+            None => {
+                let focused_pane = self.agents_workspace.focused_pane;
+                let Some(shell_session_id) = self
+                    .agents_workspace
+                    .add_mounting_session_to_pane(focused_pane)
+                else {
+                    return;
+                };
+                self.local_workspace_session_mappings
+                    .insert(key.clone(), shell_session_id);
+                shell_session_id
+            }
+        };
+        let Some(pane_id) = self.agents_workspace.pane_id_for_session(shell_session_id) else {
+            return;
+        };
+        let pane_id = self.pull_workspace_session_into_focused_pane(pane_id, shell_session_id);
+        let slot_id = AgentsTerminalBodyMountSlotId {
+            pane_id,
+            session_id: shell_session_id,
+        };
+        let has_attach_state = self.local_workspace_terminal_has_attach_state(slot_id);
+        if let Some(session) = self
+            .agents_workspace
+            .terminal_sessions
+            .iter_mut()
+            .find(|session| session.id == shell_session_id)
+        {
+            if session.title.trim().is_empty() {
+                session.title = "Terminal".to_string();
+            }
+            if !has_attach_state {
+                session.set_presentation_state_with_startup_eligibility(
+                    TerminalSessionPresentationState::Mounting,
+                    false,
+                );
+            }
+        }
+        self.agents_workspace.select_tab(pane_id, shell_session_id);
+        self.focus_shell_target(ShellFocusTarget::AgentsPane(pane_id), cx);
+        self.scroll_workspace_pane_active_tab(pane_id);
+        self.update_active_mode_cef_child_visibility(cx);
+        self.persist_shell_layout_state();
+        cx.notify();
+    }
 }

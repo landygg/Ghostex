@@ -178,6 +178,37 @@ impl GhostexGpuiApp {
         }
     }
 
+    /// Whether the store's focus names this session (the desktop's `focus_publish.rs`).
+    pub(crate) fn gx_store_selection_names_local_session(
+        &self,
+        key: &crate::app::model::GpuiLocalWorkspaceSessionKey,
+    ) -> bool {
+        self.gx_store
+            .core
+            .focus()
+            .focused_session
+            .as_ref()
+            .is_some_and(|session| {
+                session.machine.is_local()
+                    && session.project_id == key.project_id
+                    && session.session_id == key.session_id
+            })
+    }
+
+    /// A local selection (the desktop's `local_focus.rs`): the page has no burst to settle, so the store's focus moves at once.
+    pub(crate) fn gx_store_select_local_session(
+        &mut self,
+        key: &crate::app::model::GpuiLocalWorkspaceSessionKey,
+        _local_was_sleeping: bool,
+        _local_runtime_missing: bool,
+        cx: &mut Context<Self>,
+    ) {
+        self.gx_store_select_opened_session(
+            &SessionKey::local(key.project_id.as_str(), key.session_id.as_str()),
+            cx,
+        );
+    }
+
     /// The store's focus takes a session this page just opened (the desktop's `focus_publish.rs`).
     pub(crate) fn gx_store_select_opened_session(
         &mut self,

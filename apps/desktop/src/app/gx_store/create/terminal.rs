@@ -117,6 +117,11 @@ impl GhostexGpuiApp {
                             Some("terminal"),
                             cx,
                         );
+                        this.show_created_terminal_tab_while_attaching(
+                            &created_project,
+                            &session_id,
+                            cx,
+                        );
                     }
                 }
                 Err(error) => {
